@@ -1,0 +1,43 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+
+# env
+.env*.local
+
+# vercel
+.vercel
+
+# RAG index (generated, contains personal knowledge)
+# Run `npm run build-rag` to regenerate from knowledge/ directory
+public/rag-index.json
+
+# Embedding model files (22MB, downloaded at build time)
+public/models/
+
+# Sequence frames (large binary assets)
+public/frames/
+public/background/
+
+# Business card (personal)
+public/business_card.png
+
+# IDE
+.idea/
+.vscode/
+
+# TypeScript
+*.tsbuildinfo
