@@ -8,14 +8,14 @@
 
 | Layer | Tech |
 |-------|------|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript |
-| Styling | Tailwind CSS v4 |
-| Animation | GSAP ScrollTrigger + Framer Motion |
-| UI Base | shadcn/ui |
-| AI Chat | DeepSeek API (reasoner + chat) |
-| RAG | @xenova/transformers (all-MiniLM-L6-v2) + hybrid semantic/keyword search |
-| Deploy | Vercel |
+| Framework | [Next.js 16](https://github.com/vercel/next.js) (App Router, Turbopack) |
+| Language | [TypeScript](https://github.com/microsoft/TypeScript) |
+| Styling | [Tailwind CSS v4](https://github.com/tailwindlabs/tailwindcss) |
+| Animation | [GSAP ScrollTrigger](https://github.com/greensock/GSAP) + [Framer Motion](https://github.com/motiondivision/motion) |
+| UI Base | [shadcn/ui](https://github.com/shadcn-ui/ui) |
+| AI Chat | [DeepSeek API](https://github.com/deepseek-ai) (reasoner + chat) |
+| RAG | [@xenova/transformers](https://github.com/xenova/transformers.js) ([all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2)) + hybrid semantic/keyword search |
+| Deploy | [Vercel](https://github.com/vercel) |
 
 ## Architecture / 架构
 
