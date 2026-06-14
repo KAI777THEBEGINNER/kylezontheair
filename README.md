@@ -81,12 +81,15 @@ npm run dev
 npx vercel --prod
 ```
 
-## Contributors / 作者
+## Reference Projects / 参考项目
 
-| Avatar | Name | Role |
-|--------|------|------|
-| ![KAI777THEBEGINNER](https://github.com/KAI777THEBEGINNER.png?size=40) | [KAI777THEBEGINNER](https://github.com/KAI777THEBEGINNER) | Creator & owner / 项目创建者 |
-| ![claude](https://github.com/claude.png?size=40) | [claude](https://github.com/claude) | AI collaborator / AI 协作者 |
+These open-source projects were used as references during development:
+
+| Project | Source | Usage |
+|---------|--------|-------|
+| nano-design | [LeonDing319/nano-design](https://github.com/LeonDing319/nano-design) | Visual / interaction reference |
+| chatbot | [vercel/chatbot](https://github.com/vercel/chatbot) | Chatbot UI / flow reference |
+| siri-glsl | [aaaa-zhen/siri-glsl](https://github.com/aaaa-zhen/siri-glsl) | GLSL shader reference |
 
 ## Attributions / 开源声明
 
