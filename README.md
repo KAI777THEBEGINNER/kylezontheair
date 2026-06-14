@@ -81,6 +81,12 @@ npm run dev
 npx vercel --prod
 ```
 
+## Attributions / 开源声明
+
+See [ATTRIBUTIONS.md](./ATTRIBUTIONS.md) for third-party software and model licenses.
+
+第三方软件与模型许可证见 [ATTRIBUTIONS.md](./ATTRIBUTIONS.md)。
+
 ## License
 
 Personal project. All rights reserved.
