@@ -81,6 +81,13 @@ npm run dev
 npx vercel --prod
 ```
 
+## Contributors / 作者
+
+| Avatar | Name | Role |
+|--------|------|------|
+| ![KAI777THEBEGINNER](https://github.com/KAI777THEBEGINNER.png?size=40) | [KAI777THEBEGINNER](https://github.com/KAI777THEBEGINNER) | Creator & owner / 项目创建者 |
+| ![claude](https://github.com/claude.png?size=40) | [claude](https://github.com/claude) | AI collaborator / AI 协作者 |
+
 ## Attributions / 开源声明
 
 See [ATTRIBUTIONS.md](./ATTRIBUTIONS.md) for third-party software and model licenses.
