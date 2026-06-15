@@ -1,0 +1,4 @@
+# Frame files are served from CDN (NEXT_PUBLIC_FRAMES_CDN).
+# Vercel's 50MB output limit silently drops them, causing 404s.
+# Excluding them here frees space for other static assets.
+public/frames/

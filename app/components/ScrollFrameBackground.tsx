@@ -12,6 +12,13 @@ interface Props {
 
 const TOTAL_FRAMES_DEFAULT = 350;
 
+// CDN base URL for frame files — set NEXT_PUBLIC_FRAMES_CDN in Vercel env.
+// Vercel's 50MB output limit silently drops the 142MB of AVIF frames from
+// public/frames/, causing all frame loads to 404. When this env var is set,
+// frames are fetched from the CDN instead.
+// Example: https://your-cdn.example.com
+const FRAMES_CDN = process.env.NEXT_PUBLIC_FRAMES_CDN || "";
+
 // Frame ranges aligned with section progress ranges in content.ts
 const FRAME_RANGES = [
   { id: "hero", start: 0, end: 24 },
@@ -27,7 +34,8 @@ const DYNAMIC_LOOK_AHEAD = 45; // Frames ahead to preload proactively
 const GAP_BRIDGE_COUNT = 10; // Frames to preload at start of next section when in a gap
 
 function framePath(index: number): string {
-  return `/frames/frame_${String(index + 1).padStart(4, "0")}.avif`;
+  const filename = `frame_${String(index + 1).padStart(4, "0")}.avif`;
+  return FRAMES_CDN ? `${FRAMES_CDN}/frames/${filename}` : `/frames/${filename}`;
 }
 
 /** Find which section (if any) the frame index falls in, plus the next section */
@@ -333,17 +341,25 @@ export default function ScrollFrameBackground({
 
   return (
     <>
-      {/* Poster image shown while canvas not ready */}
-      {!ready && (
-        <img
-          src={posterSrc}
-          alt=""
-          className="fixed inset-0 z-0 h-[100dvh] w-[100dvw] object-cover"
-        />
-      )}
+      {/* Poster image: always rendered as a safety net behind the canvas.
+          If frames fail to load (e.g. 404 on Vercel due to size limits),
+          the poster remains visible through the transparent canvas. */}
+      <img
+        src={posterSrc}
+        alt=""
+        className={`fixed inset-0 z-0 h-[100dvh] w-[100dvw] object-cover transition-opacity duration-500 ${ready ? "opacity-0" : "opacity-100"}`}
+      />
+      {/* CSS gradient fallback: if even the poster fails, a dark gradient
+          prevents the page from showing a completely black void. */}
+      <div
+        className="fixed inset-0 z-[1] h-[100dvh] w-[100dvw]"
+        style={{
+          background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+        }}
+      />
       <canvas
         ref={canvasRef}
-        className={`fixed inset-0 z-0 h-[100dvh] w-[100dvw] object-cover ${ready ? "opacity-100" : "opacity-0"}`}
+        className={`fixed inset-0 z-[2] h-[100dvh] w-[100dvw] object-cover ${ready ? "opacity-100" : "opacity-0"}`}
         style={{ transition: "opacity 300ms ease" }}
       />
     </>

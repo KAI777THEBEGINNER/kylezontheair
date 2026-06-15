@@ -148,7 +148,11 @@ export default function Home() {
         totalFrames={350}
         onReady={handleFramesReady}
         onProgress={handleFrameProgress}
-        posterSrc="/background/poster.webp"
+        posterSrc={
+          process.env.NEXT_PUBLIC_FRAMES_CDN
+            ? `${process.env.NEXT_PUBLIC_FRAMES_CDN}/background/poster.webp`
+            : "/background/poster.webp"
+        }
       />
 
       {/* ── Layer 1.5: Loading bar (black screen + thin white line) ── */}
