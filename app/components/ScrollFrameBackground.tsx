@@ -349,14 +349,6 @@ export default function ScrollFrameBackground({
         alt=""
         className={`fixed inset-0 z-0 h-[100dvh] w-[100dvw] object-cover transition-opacity duration-500 ${ready ? "opacity-0" : "opacity-100"}`}
       />
-      {/* CSS gradient fallback: if even the poster fails, a dark gradient
-          prevents the page from showing a completely black void. */}
-      <div
-        className="fixed inset-0 z-[1] h-[100dvh] w-[100dvw]"
-        style={{
-          background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-        }}
-      />
       <canvas
         ref={canvasRef}
         className={`fixed inset-0 z-[2] h-[100dvh] w-[100dvw] object-cover ${ready ? "opacity-100" : "opacity-0"}`}
