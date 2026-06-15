@@ -21,8 +21,53 @@ const FRAME_RANGES = [
   { id: "bridge", start: 286, end: 324 },
 ];
 
+const KEYFRAME_STRIDE = 3; // Load every Nth frame first, then backfill
+const DYNAMIC_LOOK_BEHIND = 15; // Frames behind current position to keep loaded
+const DYNAMIC_LOOK_AHEAD = 45; // Frames ahead to preload proactively
+const GAP_BRIDGE_COUNT = 10; // Frames to preload at start of next section when in a gap
+
 function framePath(index: number): string {
   return `/frames/frame_${String(index + 1).padStart(4, "0")}.avif`;
+}
+
+/** Find which section (if any) the frame index falls in, plus the next section */
+function getCurrentAndNextSection(
+  frameIndex: number
+): {
+  current: (typeof FRAME_RANGES)[number] | null;
+  next: (typeof FRAME_RANGES)[number] | null;
+} {
+  for (let i = 0; i < FRAME_RANGES.length; i++) {
+    const section = FRAME_RANGES[i];
+    if (frameIndex >= section.start && frameIndex <= section.end) {
+      return { current: section, next: FRAME_RANGES[i + 1] ?? null };
+    }
+    // In a gap before the next section
+    if (
+      i < FRAME_RANGES.length - 1 &&
+      frameIndex > section.end &&
+      frameIndex < FRAME_RANGES[i + 1].start
+    ) {
+      return { current: null, next: FRAME_RANGES[i + 1] };
+    }
+  }
+  return { current: null, next: null };
+}
+
+/** Reorder frame indices so keyframes (every Nth) come first, then fill frames */
+function getKeyframePriority(indices: number[], stride: number): number[] {
+  if (indices.length === 0) return [];
+  const base = indices[0];
+  const keyframes: number[] = [];
+  const fillFrames: number[] = [];
+  for (const idx of indices) {
+    if ((idx - base) % stride === 0) {
+      keyframes.push(idx);
+    } else {
+      fillFrames.push(idx);
+    }
+  }
+  return [...keyframes, ...fillFrames];
 }
 
 export default function ScrollFrameBackground({
@@ -199,8 +244,29 @@ export default function ScrollFrameBackground({
       // 2. Entrepreneurship section: must be ready before first scroll.
       await loadBatch(nextFrames);
 
-      // 3. Background load remaining frames.
-      await loadBatch(restFrames);
+      // 3. Background load by section priority with keyframe-first ordering.
+      //    Sections beyond hero/entrepreneurship load every Nth frame first
+      //    so the background animates immediately, then backfills detail frames.
+      const remainingSections = FRAME_RANGES.slice(2); // internship, education, bridge
+      for (const section of remainingSections) {
+        if (cancelled) return;
+        const sectionFrames = Array.from(
+          { length: section.end - section.start + 1 },
+          (_, i) => section.start + i
+        );
+        const ordered = getKeyframePriority(sectionFrames, KEYFRAME_STRIDE);
+        await loadBatch(ordered);
+      }
+      // Then backfill any gap frames between sections that aren't loaded yet
+      const gapFrames = all.filter(
+        (i) =>
+          i > nextRange.end &&
+          !FRAME_RANGES.slice(2).some((s) => i >= s.start && i <= s.end) &&
+          !loadedRef.current.has(i)
+      );
+      if (gapFrames.length > 0 && !cancelled) {
+        await loadBatch(gapFrames);
+      }
     };
 
     runLoading();
@@ -210,7 +276,9 @@ export default function ScrollFrameBackground({
     };
   }, [loadFrame, onReady, totalFrames, heroRange, nextRange]);
 
-  // Dynamic loading: ensure frames around current progress are loaded
+  // Dynamic loading: ensure frames around current progress are loaded.
+  // Uses a wide forward-biased window so the background never catches up to
+  // a user scrolling at normal speed, even on slow connections.
   useEffect(() => {
     if (!ready) return;
     const frameIndex = Math.min(
@@ -218,7 +286,7 @@ export default function ScrollFrameBackground({
       Math.max(0, Math.round(progress * (totalFrames - 1)))
     );
     const nearby: number[] = [];
-    for (let offset = -8; offset <= 12; offset++) {
+    for (let offset = -DYNAMIC_LOOK_BEHIND; offset <= DYNAMIC_LOOK_AHEAD; offset++) {
       const idx = frameIndex + offset;
       if (idx >= 0 && idx < totalFrames && !loadedRef.current.has(idx)) {
         nearby.push(idx);
@@ -226,6 +294,23 @@ export default function ScrollFrameBackground({
     }
     if (nearby.length > 0) {
       Promise.all(nearby.map(loadFrame)).then(draw);
+    }
+
+    // Gap bridging: when scrolling through a gap between sections,
+    // immediately preload the first N frames of the next section so the
+    // user never arrives at a section with zero frames loaded.
+    const { current: curSec, next: nextSec } = getCurrentAndNextSection(frameIndex);
+    if (!curSec && nextSec) {
+      const bridgeFrames: number[] = [];
+      for (let i = 0; i < GAP_BRIDGE_COUNT; i++) {
+        const idx = nextSec.start + i;
+        if (idx <= nextSec.end && !loadedRef.current.has(idx)) {
+          bridgeFrames.push(idx);
+        }
+      }
+      if (bridgeFrames.length > 0) {
+        Promise.all(bridgeFrames.map(loadFrame));
+      }
     }
   }, [progress, ready, loadFrame, draw, totalFrames]);
 
