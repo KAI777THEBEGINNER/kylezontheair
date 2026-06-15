@@ -10,10 +10,9 @@
 import fs from "fs";
 import path from "path";
 
-const KB_DIR = process.env.KB_DIR ??
-  "./knowledge";
+const KB_DIR = process.env.KB_DIR ?? "./knowledge";
 
-const EXCLUDE = new Set(["数字分身规范.md", "对话起点库.md"]);
+const EXCLUDE = new Set(["数字分身规范.md", "对话起点库.md", "digital-avatar-config.md"]);
 
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 
@@ -251,7 +250,7 @@ async function main() {
 
   const dimensions = embeddings[0]?.length ?? 0;
 
-  const outPath = path.join(process.cwd(), "public", "rag-index.json");
+  const outPath = path.join(process.cwd(), "data", "rag-index.json");
   fs.writeFileSync(
     outPath,
     JSON.stringify(

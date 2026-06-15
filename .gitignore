@@ -1,5 +1,17 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
 # dependencies
 /node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
 
 # next.js
 /.next/
@@ -14,30 +26,22 @@
 
 # debug
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# env
-.env*.local
+# env files (can opt-in for committing if needed)
+.env*
 
 # vercel
 .vercel
 
-# RAG index (generated, contains personal knowledge)
-# Run `npm run build-rag` to regenerate from knowledge/ directory
-public/rag-index.json
+# knowledge base (personal data, not for GitHub)
+knowledge/
 
-# Embedding model files (22MB, downloaded at build time)
-public/models/
+# RAG index (compiled from knowledge, contains personal info)
+data/rag-index.json
 
-# Sequence frames (large binary assets)
-public/frames/
-public/background/
-
-# Business card (personal)
-public/business_card.png
-
-# IDE
-.idea/
-.vscode/
-
-# TypeScript
+# typescript
 *.tsbuildinfo
+next-env.d.ts

@@ -1,8 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-const KB_DIR = process.env.KB_DIR ??
-  "./knowledge";
+const KB_DIR = process.env.KB_DIR ?? "./knowledge";
 
 /** Load the full 数字分身规范.md as the base system prompt */
 export function loadSystemPrompt(): string {
@@ -33,7 +32,7 @@ export function loadRagIndex(): RagIndex {
   if (_indexCache) return _indexCache;
   try {
     const raw = fs.readFileSync(
-      path.join(process.cwd(), "public", "rag-index.json"),
+      path.join(process.cwd(), "data", "rag-index.json"),
       "utf-8"
     );
     _indexCache = JSON.parse(raw);
