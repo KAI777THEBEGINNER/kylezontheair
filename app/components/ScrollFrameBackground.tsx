@@ -244,7 +244,7 @@ export default function ScrollFrameBackground({
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
     if (isChatLocked) {
-      // Freeze at last frame
+      // Freeze at last frame (full-res guaranteed by dedicated preload)
       drawFrame(totalFrames - 1);
       return;
     }
@@ -256,13 +256,25 @@ export default function ScrollFrameBackground({
     };
   }, [progress, ready, draw, drawFrame, isChatLocked, totalFrames]);
 
+  // ── Chat lock: guarantee full-res last frame ──
+
+  useEffect(() => {
+    if (!ready || !isChatLocked) return;
+    const lastIndex = totalFrames - 1;
+    if (loadedRef.current.has(lastIndex)) {
+      drawFrame(lastIndex);
+    } else {
+      loadFrame(lastIndex).then(() => drawFrame(lastIndex));
+    }
+  }, [isChatLocked, ready, totalFrames, loadFrame, drawFrame]);
+
   // ── Progress reporting ──
 
   useEffect(() => {
     onProgress?.(loadProgress);
   }, [loadProgress, onProgress]);
 
-  // ── Loading: low-res first → ready → background full-res ──
+  // ── Loading: low-res + hero/last full-res in parallel → ready → remaining full-res ──
 
   useEffect(() => {
     let cancelled = false;
@@ -290,16 +302,20 @@ export default function ScrollFrameBackground({
     const runLoading = async () => {
       const all = Array.from({ length: totalFrames }, (_, i) => i);
 
-      // Phase 0: hero full-res first → first screen guaranteed sharp
+      // Phase 0: kick off hero + last frame full-res in background (don't block)
       const heroFrames = all.slice(FRAME_RANGES[0].start, FRAME_RANGES[0].end + 1);
-      await loadBatch(heroFrames);
-      if (cancelled) return;
+      const heroLoad = loadBatch(heroFrames);
+      const lastFrameLoad = loadBatch([totalFrames - 1]);
 
-      // Phase 1: all low-res → ready
+      // Phase 1: all low-res → ready (critical path, ~8MB, fast)
       await loadBatchLr(allLrIndices);
       if (cancelled) return;
       setReady(true);
       onReady?.();
+
+      // Wait for hero + last frame full-res (likely already done by now)
+      await Promise.all([heroLoad, lastFrameLoad]);
+      if (cancelled) return;
 
       // Phase 2: background load remaining full-res (section-prioritized)
       for (const section of FRAME_RANGES.slice(1)) {
