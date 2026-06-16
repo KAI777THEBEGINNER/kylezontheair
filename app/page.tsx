@@ -23,61 +23,44 @@ export default function Home() {
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadingDone, setLoadingDone] = useState(false);
 
-  const completedRef = useRef(false);
-  const targetProgressRef = useRef(0);
-  const loadStartRef = useRef(0);
+  // ── Loading bar: actual download progress, fixed 12s duration ──
+  const LOADING_DURATION = 12000;
+  const actualProgressRef = useRef(0);
+  const displayProgressRef = useRef(0);
 
-  // ── Loading bar: time-driven uniform progress with actual frame load as floor.
-  // A steady baseline fills the bar over ~2.8s so motion always looks uniform,
-  // while real critical-frame progress ensures it never race ahead of reality.
-  // The final 10% is reserved for actual completion. 12s hard ceiling as fallback.
+  // Smooth lerp animation towards actual download progress
   useEffect(() => {
-    loadStartRef.current = performance.now();
     let raf: number;
     const animate = () => {
-      const elapsed = performance.now() - loadStartRef.current;
-      // Uniform baseline: reach 0.9 in 2.8s regardless of network bursts.
-      const timeTarget = Math.min(0.9, elapsed / 2800);
-      const actualTarget = targetProgressRef.current;
-      const target = completedRef.current
-        ? 1
-        : Math.min(0.9, Math.max(timeTarget, actualTarget));
-      setLoadProgress((prev) => prev + (target - prev) * 0.12);
+      const target = actualProgressRef.current;
+      const next = displayProgressRef.current + (target - displayProgressRef.current) * 0.12;
+      if (Math.abs(next - displayProgressRef.current) > 0.001) {
+        displayProgressRef.current = next;
+        setLoadProgress(next);
+      }
       raf = requestAnimationFrame(animate);
     };
     raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
-    const forceTimer = setTimeout(() => {
-      if (completedRef.current) return;
-      completedRef.current = true;
-      targetProgressRef.current = 1;
+  // Fixed duration: enter site after LOADING_DURATION regardless of progress
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      actualProgressRef.current = 1;
+      displayProgressRef.current = 1;
       setLoadProgress(1);
       setTimeout(() => setLoadingDone(true), 400);
-    }, 12000);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(forceTimer);
-    };
+    }, LOADING_DURATION);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleFrameProgress = useCallback((ratio: number) => {
-    if (completedRef.current) return;
-    if (ratio >= 1) {
-      // All critical frames confirmed: fill the final 10% and finish.
-      completedRef.current = true;
-      targetProgressRef.current = 1;
-      setLoadProgress(1);
-      setTimeout(() => setLoadingDone(true), 400);
-    } else {
-      // Cap visible target at 90% so users know loading is still ongoing.
-      targetProgressRef.current = Math.min(0.9, ratio * 0.9);
-    }
+    actualProgressRef.current = ratio;
   }, []);
 
   const handleFramesReady = useCallback(() => {
-    // No-op: loading completion is now driven by handleFrameProgress.
-    // This callback is kept so ScrollFrameBackground can signal first-paint readiness.
+    // No-op: loading completion is driven by the fixed duration timer.
   }, []);
 
   // Entrance animation starts after loading is done
@@ -165,7 +148,7 @@ export default function Home() {
         <div className="relative w-[160px] md:w-[200px] h-[2px] rounded-full bg-[#444] overflow-hidden">
           <div
             className="animate-loading-fill"
-            style={{ width: `${loadProgress * 100}%`, transition: "width 150ms ease-out" }}
+            style={{ width: `${loadProgress * 100}%` }}
           />
         </div>
       </div>
