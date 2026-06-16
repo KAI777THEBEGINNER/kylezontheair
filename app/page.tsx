@@ -56,7 +56,8 @@ export default function Home() {
   }, []);
 
   const handleFrameProgress = useCallback((ratio: number) => {
-    actualProgressRef.current = ratio;
+    // Only allow progress to increase — prevents bounce after timer forces ref to 1
+    actualProgressRef.current = Math.max(actualProgressRef.current, ratio);
   }, []);
 
   const handleFramesReady = useCallback(() => {

@@ -28,6 +28,7 @@ const KEYFRAME_STRIDE = 3;
 const DYNAMIC_LOOK_BEHIND = 15;
 const DYNAMIC_LOOK_AHEAD = 45;
 const GAP_BRIDGE_COUNT = 10;
+const FRAME_LOAD_TIMEOUT = 3000; // ms — per-frame timeout to prevent stuck batches
 
 // ── Path helpers ──
 
@@ -127,6 +128,7 @@ export default function ScrollFrameBackground({
   const loadedRef = useRef<Set<number>>(new Set());
 
   const [ready, setReady] = useState(false);
+  const [lrDone, setLrDone] = useState(false); // all low-res loaded
   const [loadProgress, setLoadProgress] = useState(0);
   const currentProgressRef = useRef(progress);
   const rafRef = useRef<number | null>(null);
@@ -137,7 +139,7 @@ export default function ScrollFrameBackground({
   // Total items for progress tracking: low-res + full-res
   const totalLoadItems = Math.ceil(totalFrames / 2) + totalFrames; // 175 + 350 = 525
 
-  // Idempotent ready announcer — prevents double-calling onReady
+  // Idempotent ready announcer
   const announceReady = useCallback(() => {
     if (readyAnnouncedRef.current) return;
     readyAnnouncedRef.current = true;
@@ -145,34 +147,30 @@ export default function ScrollFrameBackground({
     onReady?.();
   }, [onReady]);
 
-  // ── Frame loaders ──
-  // Both increment the unified loadProgress counter.
-  // Double-load protection: check loadedRef in onload/onerror to avoid
-  // counting the same frame twice (from duplicate concurrent calls).
+  // ── Frame loaders (with per-frame timeout + double-load protection) ──
 
   const loadFrameLr = useCallback(
     (index: number): Promise<void> => {
       return new Promise((resolve) => {
-        if (loadedLrRef.current.has(index)) {
+        if (loadedLrRef.current.has(index)) { resolve(); return; }
+
+        let settled = false;
+        const settle = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          if (loadedLrRef.current.has(index)) { resolve(); return; }
+          loadedLrRef.current.add(index);
+          if (ok) imagesLrRef.current.set(index, img);
+          setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
           resolve();
-          return;
-        }
+        };
+
         const img = new Image();
         img.decoding = "async";
         img.src = frameLrPath(index);
-        img.onload = () => {
-          if (loadedLrRef.current.has(index)) { resolve(); return; }
-          loadedLrRef.current.add(index);
-          imagesLrRef.current.set(index, img);
-          setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
-          resolve();
-        };
-        img.onerror = () => {
-          if (loadedLrRef.current.has(index)) { resolve(); return; }
-          loadedLrRef.current.add(index);
-          setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
-          resolve();
-        };
+        img.onload = () => settle(true);
+        img.onerror = () => settle(false);
+        setTimeout(() => settle(false), FRAME_LOAD_TIMEOUT);
       });
     },
     [totalLoadItems]
@@ -181,26 +179,25 @@ export default function ScrollFrameBackground({
   const loadFrame = useCallback(
     (index: number): Promise<void> => {
       return new Promise((resolve) => {
-        if (loadedRef.current.has(index)) {
+        if (loadedRef.current.has(index)) { resolve(); return; }
+
+        let settled = false;
+        const settle = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          if (loadedRef.current.has(index)) { resolve(); return; }
+          loadedRef.current.add(index);
+          if (ok) imagesRef.current.set(index, img);
+          setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
           resolve();
-          return;
-        }
+        };
+
         const img = new Image();
         img.decoding = "async";
         img.src = framePath(index);
-        img.onload = () => {
-          if (loadedRef.current.has(index)) { resolve(); return; }
-          loadedRef.current.add(index);
-          imagesRef.current.set(index, img);
-          setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
-          resolve();
-        };
-        img.onerror = () => {
-          if (loadedRef.current.has(index)) { resolve(); return; }
-          loadedRef.current.add(index);
-          setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
-          resolve();
-        };
+        img.onload = () => settle(true);
+        img.onerror = () => settle(false);
+        setTimeout(() => settle(false), FRAME_LOAD_TIMEOUT);
       });
     },
     [totalLoadItems]
@@ -283,12 +280,32 @@ export default function ScrollFrameBackground({
   useEffect(() => {
     if (!ready || !isChatLocked) return;
     const lastIndex = totalFrames - 1;
+
+    // Try full-res first
     if (loadedRef.current.has(lastIndex)) {
       drawFrame(lastIndex);
-    } else {
-      loadFrame(lastIndex).then(() => drawFrame(lastIndex));
+      return;
     }
-  }, [isChatLocked, ready, totalFrames, loadFrame, drawFrame]);
+
+    // Ensure low-res last frame is available
+    const lrIndex = getNearestLowResIndex(lastIndex, totalFrames);
+    const hasLr =
+      imagesLrRef.current.has(lrIndex) &&
+      imagesLrRef.current.get(lrIndex)!.complete &&
+      imagesLrRef.current.get(lrIndex)!.naturalWidth > 0;
+
+    if (hasLr) {
+      drawFrame(lastIndex);
+      // Load full-res in background for upgrade
+      loadFrame(lastIndex).then(() => drawFrame(lastIndex));
+    } else {
+      // Load low-res last frame first, then try full-res
+      loadFrameLr(lrIndex).then(() => {
+        drawFrame(lastIndex);
+        loadFrame(lastIndex).then(() => drawFrame(lastIndex));
+      });
+    }
+  }, [isChatLocked, ready, totalFrames, loadFrame, loadFrameLr, drawFrame]);
 
   // ── Progress reporting ──
 
@@ -329,6 +346,7 @@ export default function ScrollFrameBackground({
       if (cancelled) return;
 
       // All low-res loaded → canvas can draw every frame smoothly
+      setLrDone(true);
       announceReady();
 
       // Phase 2: hero + last frame full-res (high priority for first screen + chat lock)
@@ -369,10 +387,11 @@ export default function ScrollFrameBackground({
     return () => clearTimeout(timer);
   }, [announceReady]);
 
-  // ── Dynamic window (full-res preload near current scroll position) ──
+  // ── Dynamic window: full-res preload near current scroll position ──
+  // Only active after all low-res frames are loaded (no bandwidth competition)
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !lrDone) return;
     const frameIndex = Math.min(
       totalFrames - 1,
       Math.max(0, Math.round(progress * (totalFrames - 1)))
@@ -399,7 +418,7 @@ export default function ScrollFrameBackground({
         Promise.all(bridgeFrames.map((idx) => loadFrame(idx)));
       }
     }
-  }, [progress, ready, loadFrame, draw, totalFrames]);
+  }, [progress, ready, lrDone, loadFrame, draw, totalFrames]);
 
   // ── Canvas sizing ──
 
@@ -423,8 +442,6 @@ export default function ScrollFrameBackground({
   }, [draw]);
 
   // ── Render ──
-  // Poster shows until ready, then single canvas takes over.
-  // Chat lock: canvas freezes at last frame (not poster).
 
   return (
     <>
