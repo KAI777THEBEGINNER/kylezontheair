@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import CrtTransition from "./CrtTransition";
 
 interface Props {
   progress: number;
@@ -14,7 +13,6 @@ interface Props {
 
 const TOTAL_FRAMES_DEFAULT = 350;
 
-// CDN base URL for frame files — set NEXT_PUBLIC_FRAMES_CDN in Vercel env.
 const FRAMES_CDN = process.env.NEXT_PUBLIC_FRAMES_CDN || "";
 
 // Frame ranges aligned with section progress ranges in content.ts
@@ -53,12 +51,7 @@ function getNearestLowResIndex(frameIndex: number, totalFrames: number): number 
 
 // ── Section / keyframe helpers ──
 
-function getCurrentAndNextSection(
-  frameIndex: number
-): {
-  current: (typeof FRAME_RANGES)[number] | null;
-  next: (typeof FRAME_RANGES)[number] | null;
-} {
+function getCurrentAndNextSection(frameIndex: number) {
   for (let i = 0; i < FRAME_RANGES.length; i++) {
     const section = FRAME_RANGES[i];
     if (frameIndex >= section.start && frameIndex <= section.end) {
@@ -81,11 +74,8 @@ function getKeyframePriority(indices: number[], stride: number): number[] {
   const keyframes: number[] = [];
   const fillFrames: number[] = [];
   for (const idx of indices) {
-    if ((idx - base) % stride === 0) {
-      keyframes.push(idx);
-    } else {
-      fillFrames.push(idx);
-    }
+    if ((idx - base) % stride === 0) keyframes.push(idx);
+    else fillFrames.push(idx);
   }
   return [...keyframes, ...fillFrames];
 }
@@ -126,62 +116,30 @@ export default function ScrollFrameBackground({
   posterSrc = "/background/poster.webp",
   isChatLocked = false,
 }: Props) {
-  // Full-res canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
-  const loadedRef = useRef<Set<number>>(new Set());
 
-  // Low-res canvas
-  const canvasLrRef = useRef<HTMLCanvasElement>(null);
+  // Low-res images
   const imagesLrRef = useRef<Map<number, HTMLImageElement>>(new Map());
   const loadedLrRef = useRef<Set<number>>(new Set());
+
+  // Full-res images
+  const imagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
+  const loadedRef = useRef<Set<number>>(new Set());
 
   const [ready, setReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const currentProgressRef = useRef(progress);
   const rafRef = useRef<number | null>(null);
 
-  // CRT state
-  const lastFrameRef = useRef<number>(0);
-  const [crtActive, setCrtActive] = useState(false);
-  const crtBusyRef = useRef(false);
-  const pendingFrameRef = useRef<number | null>(null);
-
   currentProgressRef.current = progress;
   const lowResTotal = Math.ceil(totalFrames / 2); // 175
 
-  // ── Full-res frame loader ──
-
-  const loadFrame = useCallback(
-    (index: number): Promise<void> => {
-      return new Promise((resolve) => {
-        if (loadedRef.current.has(index) || imagesRef.current.has(index)) {
-          resolve();
-          return;
-        }
-        const img = new Image();
-        img.decoding = "async";
-        img.src = framePath(index);
-        img.onload = () => {
-          loadedRef.current.add(index);
-          imagesRef.current.set(index, img);
-          resolve();
-        };
-        img.onerror = () => {
-          loadedRef.current.add(index);
-          resolve();
-        };
-      });
-    },
-    []
-  );
-
-  // ── Low-res frame loader ──
+  // ── Frame loaders ──
 
   const loadFrameLr = useCallback(
     (index: number): Promise<void> => {
       return new Promise((resolve) => {
-        if (loadedLrRef.current.has(index) || imagesLrRef.current.has(index)) {
+        if (loadedLrRef.current.has(index)) {
           resolve();
           return;
         }
@@ -204,113 +162,99 @@ export default function ScrollFrameBackground({
     [lowResTotal]
   );
 
-  // ── Draw helpers ──
-
-  const drawLowRes = useCallback(() => {
-    const canvas = canvasLrRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const frameIndex = Math.min(
-      totalFrames - 1,
-      Math.max(0, Math.round(currentProgressRef.current * (totalFrames - 1)))
-    );
-    const lrIndex = getNearestLowResIndex(frameIndex, totalFrames);
-
-    const img = imagesLrRef.current.get(lrIndex);
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawCover(ctx, img, canvas);
-    } else {
-      // Nearest-neighbor fallback within low-res frames
-      let nearest = -1;
-      let minDist = Infinity;
-      imagesLrRef.current.forEach((_, key) => {
-        const dist = Math.abs(key - lrIndex);
-        if (dist < minDist) {
-          minDist = dist;
-          nearest = key;
-        }
-      });
-      const nearestImg = nearest >= 0 ? imagesLrRef.current.get(nearest) : null;
-      if (nearestImg && nearestImg.complete && nearestImg.naturalWidth > 0) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawCover(ctx, nearestImg, canvas);
+  const loadFrame = useCallback((index: number): Promise<void> => {
+    return new Promise((resolve) => {
+      if (loadedRef.current.has(index)) {
+        resolve();
+        return;
       }
-    }
-  }, [totalFrames]);
+      const img = new Image();
+      img.decoding = "async";
+      img.src = framePath(index);
+      img.onload = () => {
+        loadedRef.current.add(index);
+        imagesRef.current.set(index, img);
+        resolve();
+      };
+      img.onerror = () => {
+        loadedRef.current.add(index);
+        resolve();
+      };
+    });
+  }, []);
 
-  const drawFullRes = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  // ── Draw: prefer full-res, fall back to nearest low-res ──
 
+  const drawFrame = useCallback(
+    (frameIndex: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Full-res available → draw it
+      const fullImg = imagesRef.current.get(frameIndex);
+      if (fullImg && fullImg.complete && fullImg.naturalWidth > 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawCover(ctx, fullImg, canvas);
+        return;
+      }
+
+      // Fall back to low-res (nearest even index)
+      const lrIndex = getNearestLowResIndex(frameIndex, totalFrames);
+      let bestImg: HTMLImageElement | null =
+        imagesLrRef.current.get(lrIndex) ?? null;
+
+      // If exact low-res not loaded, find nearest available
+      if (!bestImg || !bestImg.complete || bestImg.naturalWidth === 0) {
+        let nearest = -1;
+        let minDist = Infinity;
+        imagesLrRef.current.forEach((img, key) => {
+          if (img.complete && img.naturalWidth > 0) {
+            const dist = Math.abs(key - lrIndex);
+            if (dist < minDist) {
+              minDist = dist;
+              nearest = key;
+            }
+          }
+        });
+        bestImg = nearest >= 0 ? imagesLrRef.current.get(nearest)! : null;
+      }
+
+      if (bestImg) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawCover(ctx, bestImg, canvas);
+      }
+    },
+    [totalFrames]
+  );
+
+  const draw = useCallback(() => {
     const frameIndex = Math.min(
       totalFrames - 1,
       Math.max(0, Math.round(currentProgressRef.current * (totalFrames - 1)))
     );
+    drawFrame(frameIndex);
+  }, [totalFrames, drawFrame]);
 
-    const img = imagesRef.current.get(frameIndex);
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawCover(ctx, img, canvas);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // transparent → low-res shows through
-    }
-  }, [totalFrames]);
-
-  const drawBoth = useCallback(() => {
-    drawLowRes();
-    drawFullRes();
-  }, [drawLowRes, drawFullRes]);
-
-  // ── RAF loop ──
+  // ── RAF loop: redraw on every progress change ──
 
   useEffect(() => {
     if (!ready) return;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
-    rafRef.current = requestAnimationFrame(() => {
-      if (!isChatLocked) {
-        const frameIndex = Math.min(
-          totalFrames - 1,
-          Math.max(0, Math.round(currentProgressRef.current * (totalFrames - 1)))
-        );
+    if (isChatLocked) {
+      // Freeze at last frame
+      drawFrame(totalFrames - 1);
+      return;
+    }
 
-        const frameGap = Math.abs(frameIndex - lastFrameRef.current);
-        if (frameGap > 1 && !crtBusyRef.current) {
-          crtBusyRef.current = true;
-          pendingFrameRef.current = frameIndex;
-          setCrtActive(true);
-        } else if (!crtBusyRef.current) {
-          lastFrameRef.current = frameIndex;
-          drawBoth();
-        }
-      }
-    });
+    rafRef.current = requestAnimationFrame(draw);
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [progress, ready, drawBoth, isChatLocked, totalFrames]);
-
-  // ── CRT callbacks ──
-
-  const handleCrtMidpoint = useCallback(() => {
-    if (pendingFrameRef.current !== null) {
-      lastFrameRef.current = pendingFrameRef.current;
-      pendingFrameRef.current = null;
-    }
-    drawBoth();
-  }, [drawBoth]);
-
-  const handleCrtComplete = useCallback(() => {
-    crtBusyRef.current = false;
-    setCrtActive(false);
-    pendingFrameRef.current = null;
-  }, []);
+  }, [progress, ready, draw, drawFrame, isChatLocked, totalFrames]);
 
   // ── Progress reporting ──
 
@@ -318,7 +262,7 @@ export default function ScrollFrameBackground({
     onProgress?.(loadProgress);
   }, [loadProgress, onProgress]);
 
-  // ── Initial loading (SERIAL: hero full-res → low-res → remaining full-res) ──
+  // ── Loading: low-res first → ready → background full-res ──
 
   useEffect(() => {
     let cancelled = false;
@@ -345,23 +289,20 @@ export default function ScrollFrameBackground({
 
     const runLoading = async () => {
       const all = Array.from({ length: totalFrames }, (_, i) => i);
-      const heroFrames = all.slice(FRAME_RANGES[0].start, FRAME_RANGES[0].end + 1);
 
       // Phase 0: hero full-res first → first screen guaranteed sharp
+      const heroFrames = all.slice(FRAME_RANGES[0].start, FRAME_RANGES[0].end + 1);
       await loadBatch(heroFrames);
       if (cancelled) return;
 
-      // Phase 1: all low-res → onReady when complete
+      // Phase 1: all low-res → ready
       await loadBatchLr(allLrIndices);
       if (cancelled) return;
       setReady(true);
       onReady?.();
 
-      // Phase 2: background load remaining full-res (entrepreneurship → other sections → gap fill)
-      const nextFrames = all.slice(FRAME_RANGES[1].start, FRAME_RANGES[1].end + 1);
-      await loadBatch(nextFrames);
-
-      for (const section of FRAME_RANGES.slice(2)) {
+      // Phase 2: background load remaining full-res (section-prioritized)
+      for (const section of FRAME_RANGES.slice(1)) {
         if (cancelled) return;
         const sectionFrames = Array.from(
           { length: section.end - section.start + 1 },
@@ -373,8 +314,7 @@ export default function ScrollFrameBackground({
 
       const gapFrames = all.filter(
         (i) =>
-          i > FRAME_RANGES[1].end &&
-          !FRAME_RANGES.slice(2).some((s) => i >= s.start && i <= s.end) &&
+          !FRAME_RANGES.some((s) => i >= s.start && i <= s.end) &&
           !loadedRef.current.has(i)
       );
       if (gapFrames.length > 0 && !cancelled) await loadBatch(gapFrames);
@@ -386,7 +326,7 @@ export default function ScrollFrameBackground({
     };
   }, [loadFrame, loadFrameLr, onReady, totalFrames]);
 
-  // ── Dynamic window (full-res only) ──
+  // ── Dynamic window (full-res preload near current scroll position) ──
 
   useEffect(() => {
     if (!ready) return;
@@ -402,7 +342,7 @@ export default function ScrollFrameBackground({
       }
     }
     if (nearby.length > 0) {
-      Promise.all(nearby.map((idx) => loadFrame(idx))).then(drawFullRes);
+      Promise.all(nearby.map((idx) => loadFrame(idx))).then(draw);
     }
 
     const { current: curSec, next: nextSec } = getCurrentAndNextSection(frameIndex);
@@ -416,37 +356,32 @@ export default function ScrollFrameBackground({
         Promise.all(bridgeFrames.map((idx) => loadFrame(idx)));
       }
     }
-  }, [progress, ready, loadFrame, drawFullRes, totalFrames]);
+  }, [progress, ready, loadFrame, draw, totalFrames]);
 
-  // ── Canvas sizing (both canvases) ──
+  // ── Canvas sizing ──
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const canvasLr = canvasLrRef.current;
-    if (!canvas || !canvasLr) return;
+    if (!canvas) return;
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = Math.floor(window.innerWidth * dpr);
       const h = Math.floor(window.innerHeight * dpr);
-
-      [canvas, canvasLr].forEach((c) => {
-        c.width = w;
-        c.height = h;
-        c.style.width = `${window.innerWidth}px`;
-        c.style.height = `${window.innerHeight}px`;
-      });
-
-      drawBoth();
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      draw();
     };
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [drawBoth]);
+  }, [draw]);
 
   // ── Render ──
-  // z-0: poster | z-1: low-res canvas | z-2: full-res canvas | z-5: CRT overlay
-  // Chat lock: canvas crossfade out, poster crossfade in (350ms)
+  // Poster shows until ready, then single canvas takes over.
+  // Chat lock: canvas freezes at last frame (not poster).
 
   return (
     <>
@@ -454,31 +389,17 @@ export default function ScrollFrameBackground({
         src={posterSrc}
         alt=""
         className={`fixed inset-0 z-0 h-[100dvh] w-[100dvw] object-cover ${
-          ready && !isChatLocked ? "opacity-0" : "opacity-100"
+          ready ? "opacity-0" : "opacity-100"
         }`}
-        style={{ transition: "opacity 350ms ease" }}
-      />
-
-      <canvas
-        ref={canvasLrRef}
-        className={`fixed inset-0 z-[1] h-[100dvh] w-[100dvw] ${
-          ready && !isChatLocked ? "opacity-100" : "opacity-0"
-        }`}
-        style={{ transition: "opacity 350ms ease" }}
+        style={{ transition: "opacity 300ms ease" }}
       />
 
       <canvas
         ref={canvasRef}
-        className={`fixed inset-0 z-[2] h-[100dvh] w-[100dvw] ${
-          ready && !isChatLocked ? "opacity-100" : "opacity-0"
+        className={`fixed inset-0 z-[1] h-[100dvh] w-[100dvw] ${
+          ready ? "opacity-100" : "opacity-0"
         }`}
-        style={{ transition: "opacity 350ms ease" }}
-      />
-
-      <CrtTransition
-        active={crtActive}
-        onMidpoint={handleCrtMidpoint}
-        onComplete={handleCrtComplete}
+        style={{ transition: "opacity 300ms ease" }}
       />
     </>
   );

@@ -201,7 +201,7 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 async function main() {
   if (!fs.existsSync(KB_DIR)) {
     console.log(
-      `⚠️ Knowledge base directory not found: ${KB_DIR} — skipping RAG index rebuild (using existing public/rag-index.json)`
+      `⚠️ Knowledge base directory not found: ${KB_DIR} — skipping RAG index rebuild (using existing data/rag-index.json)`
     );
     return;
   }
@@ -267,7 +267,7 @@ async function main() {
 
   const sizeMB = (fs.statSync(outPath).size / (1024 * 1024)).toFixed(1);
   console.log(
-    `✅ Embedded ${embeddedChunks.length} chunks (${dimensions}d) in ${elapsed}s → public/rag-index.json (${sizeMB}MB)`
+    `✅ Embedded ${embeddedChunks.length} chunks (${dimensions}d) in ${elapsed}s → data/rag-index.json (${sizeMB}MB)`
   );
 }
 

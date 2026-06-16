@@ -1,102 +1,36 @@
-# kylezontheair
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-> Personal digital avatar website — scroll-driven frame animation background with an AI chatbot interface at the bottom.
+## Getting Started
 
-> 个人数字分身网站——滚动驱动序列帧动画背景，底部集成 AI 对话界面。
-
-## Tech Stack / 技术栈
-
-| Layer | Tech |
-|-------|------|
-| Framework | [Next.js 16](https://github.com/vercel/next.js) (App Router, Turbopack) |
-| Language | [TypeScript](https://github.com/microsoft/TypeScript) |
-| Styling | [Tailwind CSS v4](https://github.com/tailwindlabs/tailwindcss) |
-| Animation | [GSAP ScrollTrigger](https://github.com/greensock/GSAP) + [Framer Motion](https://github.com/motiondivision/motion) |
-| UI Base | [shadcn/ui](https://github.com/shadcn-ui/ui) |
-| AI Chat | [DeepSeek API](https://github.com/deepseek-ai) (reasoner + chat) |
-| RAG | [@xenova/transformers](https://github.com/xenova/transformers.js) ([all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2)) + hybrid semantic/keyword search |
-| Deploy | [Vercel](https://github.com/vercel) |
-
-## Architecture / 架构
-
-```
-app/
-├── page.tsx              # Main page (scroll background + chat overlay)
-├── api/chat/route.ts     # Streaming chat API with RAG retrieval
-├── api/follow-ups/       # Follow-up question generation
-├── components/           # UI components
-├── hooks/                # useScrollProgress, useOrientationLock
-├── data/                 # Bilingual content & question bank
-└── context/              # Language context (zh/en)
-lib/chat/
-├── knowledge.ts          # RAG search: semantic + keyword hybrid (Intl.Segmenter)
-scripts/
-├── build-rag.ts          # Build RAG index with embedding vectors
-└── prepare-frames.ts     # Convert PNG frames to AVIF
-public/
-├── frames/               # AVIF sequence frames (generated)
-├── models/               # ONNX embedding model (downloaded at build)
-└── rag-index.json        # Compiled RAG index (generated, gitignored)
-```
-
-## RAG Pipeline / RAG 管道
-
-The chatbot uses a hybrid retrieval system:
-
-1. **Build time**: `scripts/build-rag.ts` reads markdown from `knowledge/`, splits by headings, embeds each chunk with `Xenova/all-MiniLM-L6-v2` (384d vectors)
-2. **Runtime**: `lib/chat/knowledge.ts` embeds the user query, computes cosine similarity, then boosts scores with keyword hits via `Intl.Segmenter` Chinese word segmentation (`score = semantic × 1.5^keyword_hits`)
-3. **Warmup**: Frontend sends a warmup request at 50% scroll progress so the model is loaded before the user starts chatting
-
-构建时将知识库 Markdown 分块嵌入 384 维向量；运行时混合语义＋关键词检索；滚动 50% 时预热模型。
-
-## Getting Started / 开始
+First, run the development server:
 
 ```bash
-# Install dependencies
-npm install
-
-# Set environment variables
-cp .env.example .env.local
-# Edit .env.local with your DEEPSEEK_API_KEY
-
-# (Optional) Build RAG index from your knowledge base
-KB_DIR=/path/to/knowledge npm run build-rag
-
-# Dev server
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-## Environment Variables / 环境变量
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DEEPSEEK_API_KEY` | ✅ | DeepSeek API key |
-| `DEEPSEEK_BASE_URL` | ❌ | Custom API base URL |
-| `KB_DIR` | ❌ | Path to knowledge base markdown files (default: `./knowledge`) |
-| `FRAMES_DIR` | ❌ | Path to source PNG frames for AVIF conversion |
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Deploy / 部署
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-```bash
-npx vercel --prod
-```
+## Learn More
 
-## Reference Projects / 参考项目
+To learn more about Next.js, take a look at the following resources:
 
-These open-source projects were used as references during development:
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-| Project | Source | Usage |
-|---------|--------|-------|
-| nano-design | [LeonDing319/nano-design](https://github.com/LeonDing319/nano-design) | Visual / interaction reference |
-| chatbot | [vercel/chatbot](https://github.com/vercel/chatbot) | Chatbot UI / flow reference |
-| siri-glsl | [aaaa-zhen/siri-glsl](https://github.com/aaaa-zhen/siri-glsl) | GLSL shader reference |
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Attributions / 开源声明
+## Deploy on Vercel
 
-See [ATTRIBUTIONS.md](./ATTRIBUTIONS.md) for third-party software and model licenses.
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-第三方软件与模型许可证见 [ATTRIBUTIONS.md](./ATTRIBUTIONS.md)。
-
-## License
-
-Personal project. All rights reserved.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

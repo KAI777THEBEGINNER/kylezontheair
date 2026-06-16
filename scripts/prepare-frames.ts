@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 
-const INPUT_DIR = process.env.FRAMES_DIR ?? "./frames-input";
+const INPUT_DIR = "/Users/zhaoziqi/Desktop/nano-design-frames/output-frames";
 const OUTPUT_DIR = path.join(__dirname, "..", "public", "frames");
 const TARGET_FRAMES = 350;
 const QUALITY = 65;
