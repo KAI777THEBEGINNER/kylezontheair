@@ -29,6 +29,7 @@ const DYNAMIC_LOOK_BEHIND = 15;
 const DYNAMIC_LOOK_AHEAD = 45;
 const GAP_BRIDGE_COUNT = 10;
 const FRAME_LOAD_TIMEOUT = 3000; // ms — per-frame timeout to prevent stuck batches
+const MIN_LR_FOR_READY = 24; // Start canvas after 2 batches (covers hero section)
 
 // ── Path helpers ──
 
@@ -340,14 +341,24 @@ export default function ScrollFrameBackground({
 
     const runLoading = async () => {
       const all = Array.from({ length: totalFrames }, (_, i) => i);
+      let lrLoaded = 0;
 
-      // Phase 1: ALL low-res FIRST — no full-res competition for bandwidth
-      await loadBatchLr(allLrIndices);
+      // Phase 1: ALL low-res FIRST — no full-res competition for bandwidth.
+      // Start canvas as soon as enough frames cover initial scroll range.
+      for (let i = 0; i < allLrIndices.length; i += BATCH_SIZE) {
+        if (cancelled) return;
+        const batch = allLrIndices.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(loadFrameLr));
+        lrLoaded += batch.length;
+        if (lrLoaded >= MIN_LR_FOR_READY) {
+          announceReady();
+        }
+      }
       if (cancelled) return;
 
-      // All low-res loaded → canvas can draw every frame smoothly
+      // All low-res loaded → canvas can draw every frame smoothly, dynamic window can start
       setLrDone(true);
-      announceReady();
+      announceReady(); // idempotent
 
       // Phase 2: hero + last frame full-res (high priority for first screen + chat lock)
       const heroFrames = all.slice(FRAME_RANGES[0].start, FRAME_RANGES[0].end + 1);
