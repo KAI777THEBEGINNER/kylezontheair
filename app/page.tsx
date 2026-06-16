@@ -148,6 +148,7 @@ export default function Home() {
         totalFrames={350}
         onReady={handleFramesReady}
         onProgress={handleFrameProgress}
+        isChatLocked={isLocked}
         posterSrc={
           process.env.NEXT_PUBLIC_FRAMES_CDN
             ? `${process.env.NEXT_PUBLIC_FRAMES_CDN}/background/poster.webp`
