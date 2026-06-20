@@ -190,6 +190,7 @@ export default function ScrollFrameBackground({
 
         const img = new Image();
         img.decoding = "async";
+        img.crossOrigin = "anonymous";
         img.src = framePath(index);
         img.onload = () => settle(true);
         img.onerror = () => settle(false);
