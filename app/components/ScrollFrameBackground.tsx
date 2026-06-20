@@ -30,6 +30,8 @@ const DYNAMIC_LOOK_BEHIND = 15;
 const DYNAMIC_LOOK_AHEAD = 45;
 const GAP_BRIDGE_COUNT = 10;
 const FRAME_LOAD_TIMEOUT = 3000;
+const FRAME_MAX_RETRIES = 3;
+const HEALER_INTERVAL = 5000; // scan for gaps every 5s
 const MIN_FRAMES_FOR_READY = 24;
 
 // Lower resolution = larger characters in CSS pixels; crisp-edges keeps them sharp
@@ -141,6 +143,7 @@ export default function ScrollFrameBackground({
 
   const imagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
   const loadedRef = useRef<Set<number>>(new Set());
+  const retryCountRef = useRef<Map<number, number>>(new Map());
 
   const [ready, setReady] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -175,15 +178,23 @@ export default function ScrollFrameBackground({
   const loadFrame = useCallback(
     (index: number): Promise<void> => {
       return new Promise((resolve) => {
-        if (loadedRef.current.has(index)) { resolve(); return; }
+        // Already successfully loaded
+        if (imagesRef.current.has(index)) { resolve(); return; }
+        // Exceeded max retries — mark as permanently failed to stop hammering
+        const retries = retryCountRef.current.get(index) ?? 0;
+        if (retries >= FRAME_MAX_RETRIES) { resolve(); return; }
 
         let settled = false;
         const settle = (ok: boolean) => {
           if (settled) return;
           settled = true;
-          if (loadedRef.current.has(index)) { resolve(); return; }
-          loadedRef.current.add(index);
-          if (ok) imagesRef.current.set(index, img);
+          if (ok && img.complete && img.naturalWidth > 0) {
+            imagesRef.current.set(index, img);
+            loadedRef.current.add(index);
+          } else {
+            // Track retry count but do NOT add to loadedRef — frame remains "unloaded"
+            retryCountRef.current.set(index, retries + 1);
+          }
           setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
           resolve();
         };
@@ -349,7 +360,7 @@ export default function ScrollFrameBackground({
       const gapFrames = all.filter(
         (i) =>
           !FRAME_RANGES.some((s) => i >= s.start && i <= s.end) &&
-          !loadedRef.current.has(i)
+          !imagesRef.current.has(i)
       );
       if (gapFrames.length > 0 && !cancelled) await loadBatch(gapFrames);
     };
@@ -378,7 +389,7 @@ export default function ScrollFrameBackground({
     const nearby: number[] = [];
     for (let offset = -DYNAMIC_LOOK_BEHIND; offset <= DYNAMIC_LOOK_AHEAD; offset++) {
       const idx = frameIndex + offset;
-      if (idx >= 0 && idx < totalFrames && !loadedRef.current.has(idx)) {
+      if (idx >= 0 && idx < totalFrames && !imagesRef.current.has(idx)) {
         nearby.push(idx);
       }
     }
@@ -391,13 +402,39 @@ export default function ScrollFrameBackground({
       const bridgeFrames: number[] = [];
       for (let i = 0; i < GAP_BRIDGE_COUNT; i++) {
         const idx = nextSec.start + i;
-        if (idx <= nextSec.end && !loadedRef.current.has(idx)) bridgeFrames.push(idx);
+        if (idx <= nextSec.end && !imagesRef.current.has(idx)) bridgeFrames.push(idx);
       }
       if (bridgeFrames.length > 0) {
         Promise.all(bridgeFrames.map((idx) => loadFrame(idx)));
       }
     }
   }, [progress, ready, loadFrame, draw, totalFrames]);
+
+  // ── Gap healer: periodically retry frames that failed to load ──
+
+  useEffect(() => {
+    if (!ready) return;
+    const BATCH_SIZE = 8;
+
+    const heal = async () => {
+      const missing: number[] = [];
+      for (let i = 0; i < totalFrames; i++) {
+        if (!imagesRef.current.has(i)) missing.push(i);
+      }
+      if (missing.length === 0) return;
+
+      // Load in small batches to avoid hammering the network
+      for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+        const batch = missing.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map((idx) => loadFrame(idx)));
+      }
+    };
+
+    // Run immediately, then on interval
+    heal();
+    const timer = setInterval(heal, HEALER_INTERVAL);
+    return () => clearInterval(timer);
+  }, [ready, totalFrames, loadFrame]);
 
   // ── Canvas sizing (capped resolution for ASCII performance) ──
 
