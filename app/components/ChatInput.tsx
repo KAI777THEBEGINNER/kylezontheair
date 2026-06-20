@@ -85,7 +85,7 @@ const ChatInput = forwardRef<ChatInputRef, Props>(function ChatInput({ onSend, d
       {/* Send / Stop button */}
       <CapsuleButton
         onClick={isSubmitting ? onStop : handleSubmit}
-        className="relative h-[57px] w-[57px] !rounded-full !px-0 shrink-0 overflow-hidden"
+        className="relative h-[57px] w-[57px] !rounded-full !px-0 shrink-0 overflow-hidden !bg-black"
       >
         <span
           className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
