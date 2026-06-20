@@ -31,8 +31,8 @@ export default function ChatMessage({ role, content }: Props) {
             textShadow: "0 0 0.5px #fff, 0 1px 2px #000",
             // Force compositing layer and explicit vendor prefix for stable backdrop blur
             transform: "translateZ(0)",
-            WebkitBackdropFilter: "blur(24px)",
-            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(5px)",
+            backdropFilter: "blur(5px)",
           }}
         >
           {content}

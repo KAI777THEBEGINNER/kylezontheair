@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
+import { renderAscii, type AsciiParams } from "../engines/ascii";
 
 interface Props {
   progress: number;
@@ -28,27 +29,43 @@ const KEYFRAME_STRIDE = 3;
 const DYNAMIC_LOOK_BEHIND = 15;
 const DYNAMIC_LOOK_AHEAD = 45;
 const GAP_BRIDGE_COUNT = 10;
-const FRAME_LOAD_TIMEOUT = 3000; // ms — per-frame timeout to prevent stuck batches
-const MIN_LR_FOR_READY = 24; // Start canvas after 2 batches (covers hero section)
+const FRAME_LOAD_TIMEOUT = 3000;
+const MIN_FRAMES_FOR_READY = 24;
+
+// Lower resolution = larger characters in CSS pixels; crisp-edges keeps them sharp
+const ASCII_MAX_DIM = 800;
+
+// ── ASCII configuration from nano-design ──
+const ASCII_PARAMS: AsciiParams = {
+  charSet: "classic",
+  customChars: "Ñ@#W$9876543210?!abc;:+=-,._ ",
+  fontSize: 7,
+  coverage: 100,
+  edgeEmphasis: 100,
+  bgColor: "#000000",
+  bgBlur: 5,
+  bgOpacity: 34,
+  charOpacity: 76,
+  charBrightness: 0,
+  charContrast: -11,
+  invert: true,
+  dotGrid: true,
+  animated: false,
+  animSpeed: 1.5,
+  animIntensity: 60,
+  animRandomness: 50,
+  colorTint: "#ff6600",
+  colorTintOpacity: 0,
+  colorTintBlend: "multiply",
+};
 
 // ── Path helpers ──
 
 function framePath(index: number): string {
   const filename = `frame_${String(index + 1).padStart(4, "0")}.avif`;
-  return FRAMES_CDN ? `${FRAMES_CDN}/frames/${filename}` : `/frames/${filename}`;
-}
-
-function frameLrPath(index: number): string {
-  const filename = `frame_lr_${String(index + 1).padStart(4, "0")}.avif`;
-  return FRAMES_CDN ? `${FRAMES_CDN}/frames_lr/${filename}` : `/frames_lr/${filename}`;
-}
-
-function getNearestLowResIndex(frameIndex: number, totalFrames: number): number {
-  if (frameIndex % 2 === 0) return frameIndex;
-  const lower = frameIndex - 1;
-  const upper = frameIndex + 1;
-  if (upper < totalFrames) return upper; // prefer forward
-  return lower;
+  return FRAMES_CDN
+    ? `${FRAMES_CDN}/frames_no_ascii/${filename}`
+    : `/frames_no_ascii/${filename}`;
 }
 
 // ── Section / keyframe helpers ──
@@ -86,12 +103,13 @@ function getKeyframePriority(indices: number[], stride: number): number[] {
 
 function drawCover(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  canvas: HTMLCanvasElement
+  img: HTMLImageElement | HTMLCanvasElement,
+  cw: number,
+  ch: number
 ) {
-  const cw = canvas.width;
-  const ch = canvas.height;
-  const imgAspect = img.naturalWidth / img.naturalHeight;
+  const imgW = img instanceof HTMLCanvasElement ? img.width : img.naturalWidth;
+  const imgH = img instanceof HTMLCanvasElement ? img.height : img.naturalHeight;
+  const imgAspect = imgW / imgH;
   const canvasAspect = cw / ch;
   let drawW: number, drawH: number, drawX: number, drawY: number;
   if (canvasAspect > imgAspect) {
@@ -119,63 +137,40 @@ export default function ScrollFrameBackground({
   isChatLocked = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const offscreenRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Low-res images
-  const imagesLrRef = useRef<Map<number, HTMLImageElement>>(new Map());
-  const loadedLrRef = useRef<Set<number>>(new Set());
-
-  // Full-res images
   const imagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
   const loadedRef = useRef<Set<number>>(new Set());
 
   const [ready, setReady] = useState(false);
-  const [lrDone, setLrDone] = useState(false); // all low-res loaded
   const [loadProgress, setLoadProgress] = useState(0);
   const currentProgressRef = useRef(progress);
-  const rafRef = useRef<number | null>(null);
+  const lastFrameIndexRef = useRef<number>(-1);
   const readyAnnouncedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  // Ref to break circular dep: announceReady needs drawFrame, defined later
+  const drawFrameRef = useRef<(idx: number) => void>(() => {});
 
   currentProgressRef.current = progress;
 
-  // Total items for progress tracking: low-res + full-res
-  const totalLoadItems = Math.ceil(totalFrames / 2) + totalFrames; // 175 + 350 = 525
+  const totalLoadItems = totalFrames;
 
-  // Idempotent ready announcer
+  // Idempotent ready announcer — draws first frame synchronously
+  // so the canvas has content BEFORE the opacity transition starts
   const announceReady = useCallback(() => {
     if (readyAnnouncedRef.current) return;
     readyAnnouncedRef.current = true;
+    // Synchronously render first frame so canvas isn't blank when it fades in
+    const frameIndex = Math.min(
+      totalFrames - 1,
+      Math.max(0, Math.round(currentProgressRef.current * (totalFrames - 1)))
+    );
+    drawFrameRef.current(frameIndex);
     setReady(true);
     onReady?.();
-  }, [onReady]);
+  }, [onReady, totalFrames]);
 
-  // ── Frame loaders (with per-frame timeout + double-load protection) ──
-
-  const loadFrameLr = useCallback(
-    (index: number): Promise<void> => {
-      return new Promise((resolve) => {
-        if (loadedLrRef.current.has(index)) { resolve(); return; }
-
-        let settled = false;
-        const settle = (ok: boolean) => {
-          if (settled) return;
-          settled = true;
-          if (loadedLrRef.current.has(index)) { resolve(); return; }
-          loadedLrRef.current.add(index);
-          if (ok) imagesLrRef.current.set(index, img);
-          setLoadProgress((p) => Math.min(1, p + 1 / totalLoadItems));
-          resolve();
-        };
-
-        const img = new Image();
-        img.decoding = "async";
-        img.src = frameLrPath(index);
-        img.onload = () => settle(true);
-        img.onerror = () => settle(false);
-        setTimeout(() => settle(false), FRAME_LOAD_TIMEOUT);
-      });
-    },
-    [totalLoadItems]
-  );
+  // ── Frame loader ──
 
   const loadFrame = useCallback(
     (index: number): Promise<void> => {
@@ -204,7 +199,7 @@ export default function ScrollFrameBackground({
     [totalLoadItems]
   );
 
-  // ── Draw: prefer full-res, fall back to nearest low-res ──
+  // ── Draw: render ASCII on canvas using frame image as source ──
 
   const drawFrame = useCallback(
     (frameIndex: number) => {
@@ -213,42 +208,55 @@ export default function ScrollFrameBackground({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Full-res available → draw it
-      const fullImg = imagesRef.current.get(frameIndex);
-      if (fullImg && fullImg.complete && fullImg.naturalWidth > 0) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawCover(ctx, fullImg, canvas);
-        return;
-      }
+      // Skip re-rendering if frame hasn't changed AND previous draw succeeded
+      if (frameIndex === lastFrameIndexRef.current) return;
 
-      // Fall back to low-res (nearest even index)
-      const lrIndex = getNearestLowResIndex(frameIndex, totalFrames);
-      let bestImg: HTMLImageElement | null =
-        imagesLrRef.current.get(lrIndex) ?? null;
+      // Find the best available frame image
+      const exact = imagesRef.current.get(frameIndex);
+      let bestImg: HTMLImageElement | null = null;
 
-      // If exact low-res not loaded, find nearest available
-      if (!bestImg || !bestImg.complete || bestImg.naturalWidth === 0) {
+      if (exact && exact.complete && exact.naturalWidth > 0) {
+        bestImg = exact;
+      } else {
+        // Fall back to nearest available
         let nearest = -1;
         let minDist = Infinity;
-        imagesLrRef.current.forEach((img, key) => {
+        imagesRef.current.forEach((img, key) => {
           if (img.complete && img.naturalWidth > 0) {
-            const dist = Math.abs(key - lrIndex);
+            const dist = Math.abs(key - frameIndex);
             if (dist < minDist) {
               minDist = dist;
               nearest = key;
             }
           }
         });
-        bestImg = nearest >= 0 ? imagesLrRef.current.get(nearest)! : null;
+        bestImg = nearest >= 0 ? imagesRef.current.get(nearest)! : null;
       }
 
-      if (bestImg) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawCover(ctx, bestImg, canvas);
+      if (!bestImg) return;
+
+      // Only mark frame as drawn AFTER confirming we have an image to render
+      lastFrameIndexRef.current = frameIndex;
+
+      // Ensure offscreen canvas exists and matches current canvas size
+      if (!offscreenRef.current) {
+        offscreenRef.current = document.createElement("canvas");
       }
+      const offscreen = offscreenRef.current;
+      offscreen.width = canvas.width;
+      offscreen.height = canvas.height;
+      const offCtx = offscreen.getContext("2d")!;
+      offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+      drawCover(offCtx, bestImg, offscreen.width, offscreen.height);
+
+      // Render real-time ASCII effect on the visible canvas
+      renderAscii(ctx, offscreen, ASCII_PARAMS, canvas.width, canvas.height);
     },
-    [totalFrames]
+    []
   );
+
+  // Keep ref in sync so announceReady can call it
+  drawFrameRef.current = drawFrame;
 
   const draw = useCallback(() => {
     const frameIndex = Math.min(
@@ -258,13 +266,14 @@ export default function ScrollFrameBackground({
     drawFrame(frameIndex);
   }, [totalFrames, drawFrame]);
 
-  // ── RAF loop: redraw on every progress change ──
+  // ── RAF loop: redraw on progress change ──
 
   useEffect(() => {
     if (!ready) return;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
     if (isChatLocked) {
+      lastFrameIndexRef.current = -1; // Force re-render for chat lock frame
       drawFrame(totalFrames - 1);
       return;
     }
@@ -276,37 +285,23 @@ export default function ScrollFrameBackground({
     };
   }, [progress, ready, draw, drawFrame, isChatLocked, totalFrames]);
 
-  // ── Chat lock: guarantee full-res last frame ──
+  // ── Chat lock: guarantee last frame ──
 
   useEffect(() => {
     if (!ready || !isChatLocked) return;
     const lastIndex = totalFrames - 1;
 
-    // Try full-res first
     if (loadedRef.current.has(lastIndex)) {
+      lastFrameIndexRef.current = -1;
       drawFrame(lastIndex);
       return;
     }
 
-    // Ensure low-res last frame is available
-    const lrIndex = getNearestLowResIndex(lastIndex, totalFrames);
-    const hasLr =
-      imagesLrRef.current.has(lrIndex) &&
-      imagesLrRef.current.get(lrIndex)!.complete &&
-      imagesLrRef.current.get(lrIndex)!.naturalWidth > 0;
-
-    if (hasLr) {
+    loadFrame(lastIndex).then(() => {
+      lastFrameIndexRef.current = -1;
       drawFrame(lastIndex);
-      // Load full-res in background for upgrade
-      loadFrame(lastIndex).then(() => drawFrame(lastIndex));
-    } else {
-      // Load low-res last frame first, then try full-res
-      loadFrameLr(lrIndex).then(() => {
-        drawFrame(lastIndex);
-        loadFrame(lastIndex).then(() => drawFrame(lastIndex));
-      });
-    }
-  }, [isChatLocked, ready, totalFrames, loadFrame, loadFrameLr, drawFrame]);
+    });
+  }, [isChatLocked, ready, totalFrames, loadFrame, drawFrame]);
 
   // ── Progress reporting ──
 
@@ -314,22 +309,12 @@ export default function ScrollFrameBackground({
     onProgress?.(loadProgress);
   }, [loadProgress, onProgress]);
 
-  // ── Loading: low-res first → hero+last full-res → remaining full-res ──
+  // ── Loading: hero first → sections → gaps (no low-res tier needed) ──
 
   useEffect(() => {
     let cancelled = false;
     const BATCH_SIZE = 12;
-
-    const allLrIndices: number[] = [];
-    for (let i = 0; i < totalFrames; i += 2) allLrIndices.push(i);
-
-    const loadBatchLr = async (indices: number[]) => {
-      for (let i = 0; i < indices.length; i += BATCH_SIZE) {
-        if (cancelled) return;
-        const batch = indices.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(loadFrameLr));
-      }
-    };
+    const all = Array.from({ length: totalFrames }, (_, i) => i);
 
     const loadBatch = async (indices: number[]) => {
       for (let i = 0; i < indices.length; i += BATCH_SIZE) {
@@ -340,33 +325,14 @@ export default function ScrollFrameBackground({
     };
 
     const runLoading = async () => {
-      const all = Array.from({ length: totalFrames }, (_, i) => i);
-      let lrLoaded = 0;
-
-      // Phase 1: ALL low-res FIRST — no full-res competition for bandwidth.
-      // Start canvas as soon as enough frames cover initial scroll range.
-      for (let i = 0; i < allLrIndices.length; i += BATCH_SIZE) {
-        if (cancelled) return;
-        const batch = allLrIndices.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(loadFrameLr));
-        lrLoaded += batch.length;
-        if (lrLoaded >= MIN_LR_FOR_READY) {
-          announceReady();
-        }
-      }
-      if (cancelled) return;
-
-      // All low-res loaded → canvas can draw every frame smoothly, dynamic window can start
-      setLrDone(true);
-      announceReady(); // idempotent
-
-      // Phase 2: hero + last frame full-res (high priority for first screen + chat lock)
+      // Phase 1: hero + last frame (highest priority for first screen + chat lock)
       const heroFrames = all.slice(FRAME_RANGES[0].start, FRAME_RANGES[0].end + 1);
-      const priorityFullRes = [...new Set([...heroFrames, totalFrames - 1])];
-      await loadBatch(priorityFullRes);
+      const priorityFrames = [...new Set([...heroFrames, totalFrames - 1])];
+      await loadBatch(priorityFrames);
       if (cancelled) return;
+      announceReady();
 
-      // Phase 3: remaining full-res (section-prioritized)
+      // Phase 2: remaining sections (keyframe-prioritized)
       for (const section of FRAME_RANGES.slice(1)) {
         if (cancelled) return;
         const sectionFrames = Array.from(
@@ -376,7 +342,9 @@ export default function ScrollFrameBackground({
         const ordered = getKeyframePriority(sectionFrames, KEYFRAME_STRIDE);
         await loadBatch(ordered);
       }
+      if (cancelled) return;
 
+      // Phase 3: gap frames between sections
       const gapFrames = all.filter(
         (i) =>
           !FRAME_RANGES.some((s) => i >= s.start && i <= s.end) &&
@@ -389,7 +357,7 @@ export default function ScrollFrameBackground({
     return () => {
       cancelled = true;
     };
-  }, [loadFrame, loadFrameLr, announceReady, totalFrames]);
+  }, [loadFrame, announceReady, totalFrames]);
 
   // ── Fallback: force ready if loading stalls ──
 
@@ -398,11 +366,10 @@ export default function ScrollFrameBackground({
     return () => clearTimeout(timer);
   }, [announceReady]);
 
-  // ── Dynamic window: full-res preload near current scroll position ──
-  // Only active after all low-res frames are loaded (no bandwidth competition)
+  // ── Dynamic window: preload near current scroll position ──
 
   useEffect(() => {
-    if (!ready || !lrDone) return;
+    if (!ready) return;
     const frameIndex = Math.min(
       totalFrames - 1,
       Math.max(0, Math.round(progress * (totalFrames - 1)))
@@ -429,22 +396,23 @@ export default function ScrollFrameBackground({
         Promise.all(bridgeFrames.map((idx) => loadFrame(idx)));
       }
     }
-  }, [progress, ready, lrDone, loadFrame, draw, totalFrames]);
+  }, [progress, ready, loadFrame, draw, totalFrames]);
 
-  // ── Canvas sizing ──
+  // ── Canvas sizing (capped resolution for ASCII performance) ──
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.floor(window.innerWidth * dpr);
-      const h = Math.floor(window.innerHeight * dpr);
-      canvas.width = w;
-      canvas.height = h;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const maxDim = Math.max(vw, vh);
+      const scale = maxDim > ASCII_MAX_DIM ? ASCII_MAX_DIM / maxDim : 1;
+      canvas.width = Math.floor(vw * scale);
+      canvas.height = Math.floor(vh * scale);
+      // Reset frame index to force re-render at new size
+      lastFrameIndexRef.current = -1;
       draw();
     };
     resize();
@@ -470,8 +438,9 @@ export default function ScrollFrameBackground({
         className={`fixed inset-0 z-[1] h-[100dvh] w-[100dvw] ${
           ready ? "opacity-100" : "opacity-0"
         }`}
-        style={{ transition: "opacity 300ms ease" }}
+        style={{ transition: "opacity 300ms ease", imageRendering: "crisp-edges" }}
       />
+
     </>
   );
 }

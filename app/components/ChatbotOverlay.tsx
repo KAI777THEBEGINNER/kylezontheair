@@ -45,6 +45,8 @@ export default function ChatbotOverlay({ progress, lang, onBackToTop, isLocked }
   const [followUpQuestions, setFollowUpQuestions] = useState<QuestionItem[]>([]);
   const [scrolled, setScrolled] = useState(false);
   const [inputHeight, setInputHeight] = useState(100);
+  const [thinkingElapsed, setThinkingElapsed] = useState(0);
+  const thinkingStartRef = useRef(0);
 
   const isSubmitting = status === "submitted" || status === "streaming";
   // Only show chat UI when locked (scrolled to bottom), never in mid-opacity.
@@ -133,6 +135,20 @@ export default function ChatbotOverlay({ progress, lang, onBackToTop, isLocked }
     });
   }, [messages, followUpQuestions]);
 
+  // Thinking timer — tracks elapsed time while waiting for model response
+  useEffect(() => {
+    if (status === "submitted") {
+      thinkingStartRef.current = Date.now();
+      setThinkingElapsed(0);
+      const timer = setInterval(() => {
+        setThinkingElapsed((Date.now() - thinkingStartRef.current) / 1000);
+      }, 100);
+      return () => clearInterval(timer);
+    } else {
+      setThinkingElapsed(0);
+    }
+  }, [status]);
+
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
     const st = scrollRef.current.scrollTop;
@@ -198,7 +214,9 @@ export default function ChatbotOverlay({ progress, lang, onBackToTop, isLocked }
             )}
             {status === "submitted" && (
               <div className="py-1 text-[14px] text-shimmer">
-                {lang === "zh" ? "正在思考..." : "Thinking..."}
+                {lang === "zh"
+                  ? `正在思考｜${thinkingElapsed.toFixed(1)}s...`
+                  : `Thinking for ${thinkingElapsed.toFixed(1)}s...`}
               </div>
             )}
 

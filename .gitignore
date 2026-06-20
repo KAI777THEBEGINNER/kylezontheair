@@ -39,6 +39,9 @@ yarn-error.log*
 # wrangler local state
 .wrangler
 
+# old background frames (replaced by frames_no_ascii/ — kept locally, excluded from deploy)
+public/frames/
+
 # knowledge base (personal data, not for GitHub)
 knowledge/
 
