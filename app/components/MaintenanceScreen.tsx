@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const EN_LINE = "I'm currently editing my resume...";
-const ZH_LINE = "简历正在更新中...";
+const EN_LINE = "I'm currently editing my resume:)";
+const ZH_LINE = "简历正在更新中";
 const BRAND_A = "[KYLE ZHAO]";
 const BRAND_B = "[ByteDancing]";
 /** [ByteDancing] is the longer mark — monospace makes 13ch its exact width */
@@ -119,17 +119,26 @@ export default function MaintenanceScreen() {
         </span>
       </p>
 
-      {/* Fixed ch-width box: both brand marks occupy exactly the same width */}
+      {/* Width locked by an invisible sizer of the widest mark, so both states and
+          every mid-transition frame occupy exactly the same box — no breathing */}
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <span className="inline-block w-[13ch] text-center font-mono font-bold text-white/40 text-[13px] tracking-wider whitespace-pre">
-          {brand.k === 0 && (brand.show === "A" ? BRAND_A : BRAND_B)}
-          {brand.k > 0 && (
-            <ReplacingLine
-              from={brand.show === "A" ? BRAND_B : BRAND_A}
-              to={brand.show === "A" ? BRAND_A : BRAND_B}
-              k={brand.k}
-            />
-          )}
+        <span className="inline-grid font-mono font-bold text-white/40 text-[13px] tracking-wider whitespace-pre">
+          <span className="invisible col-start-1 row-start-1" aria-hidden>
+            {BRAND_B}
+          </span>
+          <span className="col-start-1 row-start-1 text-center">
+            {brand.k === 0
+              ? brand.show === "A"
+                ? BRAND_A
+                : BRAND_B
+              : (
+                <ReplacingLine
+                  from={brand.show === "A" ? BRAND_B : BRAND_A}
+                  to={brand.show === "A" ? BRAND_A : BRAND_B}
+                  k={brand.k}
+                />
+              )}
+          </span>
         </span>
       </div>
     </div>
