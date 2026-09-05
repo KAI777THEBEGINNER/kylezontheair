@@ -1,179 +1,133 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import TypewriterText from "./TypewriterText";
 
 const EN_LINE = "I'm currently editing my resume...";
 const ZH_LINE = "简历正在更新中...";
 const BRAND_A = "[KYLE ZHAO]";
 const BRAND_B = "[ByteDancing]";
+/** [ByteDancing] is the longer mark — monospace makes 13ch its exact width */
+const BRAND_WIDTH_CH = BRAND_B.length;
 
 const TYPE_START_DELAY = 600;
-const TYPE_CHAR_MS = 45;
-const REPLACE_CHAR_MS = 55;
+const TYPE_CHAR_MS = [45, 95]; // per-char delay: [EN, ZH]
+const DELETE_CHAR_MS = 28;
 const HOLD_MS = 2400;
+const REPLACE_CHAR_MS = 55;
 const BRAND_LEAD_MS = 3200;
 
-type Step = "typeA" | "holdA" | "toB" | "holdB" | "toA";
-
-const replaceDuration = (a: string, b: string) =>
-  Math.max(a.length, b.length) * REPLACE_CHAR_MS;
-
-/**
- * One line's life cycle: type A → hold → replace to B → hold → replace to A → loop.
- * firstHoldMs != null skips the initial typing (line starts settled on A) and
- * offsets the first switch, so two lines can run out of phase.
- */
-function useLineCycle(a: string, b: string, firstHoldMs: number | null) {
-  const [step, setStep] = useState<Step>(firstHoldMs != null ? "holdA" : "typeA");
-  const firstHold = useRef(firstHoldMs != null);
+/** Runs `compute(performance.now())` on every frame, re-rendering only on change.
+ *  Timestamp-driven: no chained timers, immune to background-tab throttling,
+ *  self-corrects after the tab was hidden. */
+function useTimeline<T>(compute: (t: number) => T, key: (s: T) => string): T {
+  const [state, setState] = useState<T>(() => compute(0));
+  const keyRef = useRef(key(state));
+  const computeRef = useRef(compute);
+  computeRef.current = compute;
 
   useEffect(() => {
-    if (step === "typeA") return; // advanced by TypewriterText onComplete
-    let delay: number;
-    if (step === "holdA") {
-      delay = firstHold.current ? (firstHoldMs as number) : HOLD_MS;
-      firstHold.current = false;
-    } else if (step === "holdB") {
-      delay = HOLD_MS;
-    } else {
-      delay = replaceDuration(a, b);
-    }
-    const t = setTimeout(() => {
-      setStep(
-        step === "holdA" ? "toB" : step === "toB" ? "holdB" : step === "holdB" ? "toA" : "holdA"
-      );
-    }, delay);
-    return () => clearTimeout(t);
-  }, [step, a, b, firstHoldMs]);
+    let raf = 0;
+    const tick = () => {
+      const next = computeRef.current(performance.now());
+      const k = key(next);
+      if (k !== keyRef.current) {
+        keyRef.current = k;
+        setState(next);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return [step, setStep] as const;
+  return state;
 }
 
-/** char-by-char replacement cursor (0 → maxLen) while a replace phase is active */
-function useReplaceProgress(active: boolean, maxLen: number) {
-  const [k, setK] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    setK(0);
-    let i = 0;
-    const t = setInterval(() => {
-      i += 1;
-      setK(i);
-      if (i >= maxLen) clearInterval(t);
-    }, REPLACE_CHAR_MS);
-    return () => clearInterval(t);
-  }, [active, maxLen]);
-  return k;
+// ── Main line timeline: type EN → hold → delete → type ZH → hold → delete → loop ──
+
+const TYPE_EN_MS = EN_LINE.length * TYPE_CHAR_MS[0];
+const TYPE_ZH_MS = ZH_LINE.length * TYPE_CHAR_MS[1];
+const DEL_EN_MS = EN_LINE.length * DELETE_CHAR_MS;
+const DEL_ZH_MS = ZH_LINE.length * DELETE_CHAR_MS;
+const MAIN_CYCLE =
+  TYPE_EN_MS + HOLD_MS + DEL_EN_MS + TYPE_ZH_MS + HOLD_MS + DEL_ZH_MS;
+
+function mainStateAt(t: number): { lang: 0 | 1; len: number } {
+  const u = Math.max(0, t - TYPE_START_DELAY) % MAIN_CYCLE;
+  if (u < TYPE_EN_MS) return { lang: 0, len: Math.min(EN_LINE.length, Math.ceil(u / TYPE_CHAR_MS[0])) };
+  let v = u - TYPE_EN_MS;
+  if (v < HOLD_MS) return { lang: 0, len: EN_LINE.length };
+  v -= HOLD_MS;
+  if (v < DEL_EN_MS) return { lang: 0, len: EN_LINE.length - 1 - Math.floor(v / DELETE_CHAR_MS) };
+  v -= DEL_EN_MS;
+  if (v < TYPE_ZH_MS) return { lang: 1, len: Math.min(ZH_LINE.length, Math.ceil(v / TYPE_CHAR_MS[1])) };
+  v -= TYPE_ZH_MS;
+  if (v < HOLD_MS) return { lang: 1, len: ZH_LINE.length };
+  v -= HOLD_MS;
+  return { lang: 1, len: ZH_LINE.length - 1 - Math.floor(v / DELETE_CHAR_MS) };
 }
 
-/** Mid-transition render: first k chars already switched to `to`, the rest still `from` */
-function ReplacingLine({
-  from,
-  to,
-  k,
-  fromClass,
-  toClass,
-}: {
-  from: string;
-  to: string;
-  k: number;
-  fromClass: string;
-  toClass: string;
-}) {
-  const maxLen = Math.max(from.length, to.length);
+// ── Brand timeline: [KYLE ZHAO] ⇄ [ByteDancing] via char-by-char replace, offset from main text ──
+
+const BRAND_REPLACE_MS = BRAND_WIDTH_CH * REPLACE_CHAR_MS;
+const BRAND_PERIOD = 2 * (BRAND_REPLACE_MS + HOLD_MS);
+
+function brandStateAt(t: number): { show: "A" | "B"; k: number } {
+  if (t < BRAND_LEAD_MS) return { show: "A", k: 0 };
+  const u = (t - BRAND_LEAD_MS) % BRAND_PERIOD;
+  if (u < BRAND_REPLACE_MS) return { show: "B", k: Math.ceil(u / REPLACE_CHAR_MS) };
+  if (u < BRAND_REPLACE_MS + HOLD_MS) return { show: "B", k: 0 };
+  const v = u - BRAND_REPLACE_MS - HOLD_MS;
+  if (v < BRAND_REPLACE_MS) return { show: "A", k: Math.ceil(v / REPLACE_CHAR_MS) };
+  return { show: "A", k: 0 };
+}
+
+/** Mid-transition render: first k chars switched to `to`, the rest still `from` */
+function ReplacingLine({ from, to, k }: { from: string; to: string; k: number }) {
   const chars = [];
-  for (let i = 0; i < maxLen; i++) {
+  for (let i = 0; i < BRAND_WIDTH_CH; i++) {
     if (i < k && i < to.length) {
       chars.push(
-        <span key={`to-${i}`} className={`inline-block whitespace-pre animate-typewriter-char ${toClass}`}>
+        <span key={`to-${i}`} className="inline-block whitespace-pre animate-typewriter-char">
           {to[i] === " " ? " " : to[i]}
         </span>
       );
     } else if (i < from.length) {
       chars.push(
-        <span key={`from-${i}`} className={`inline-block whitespace-pre ${fromClass}`}>
+        <span key={`from-${i}`} className="inline-block whitespace-pre">
           {from[i] === " " ? " " : from[i]}
         </span>
       );
     }
-    // else: beyond both texts (new text longer) — nothing yet, appears when k reaches it
   }
   return <span>{chars}</span>;
 }
 
 export default function MaintenanceScreen() {
-  const [step, setStep] = useLineCycle(EN_LINE, ZH_LINE, null);
-  const [brandStep] = useLineCycle(BRAND_A, BRAND_B, BRAND_LEAD_MS);
+  const main = useTimeline(mainStateAt, s => `${s.lang}:${s.len}`);
+  const brand = useTimeline(brandStateAt, s => `${s.show}:${s.k}`);
 
-  const mainReplaceK = useReplaceProgress(
-    step === "toB" || step === "toA",
-    Math.max(EN_LINE.length, ZH_LINE.length)
-  );
-  const brandReplaceK = useReplaceProgress(
-    brandStep === "toB" || brandStep === "toA",
-    Math.max(BRAND_A.length, BRAND_B.length)
-  );
+  const mainText = main.lang === 0 ? EN_LINE : ZH_LINE;
 
   return (
     <div className="fixed inset-0 z-[10001] bg-black flex flex-col items-center justify-center px-8 text-center">
       {/* Fixed-height line so EN/ZH swaps don't shift the layout */}
       <p className="h-[1.5em] flex items-center text-white text-[20px] md:text-[26px] tracking-wide">
-        {step === "typeA" && (
-          <TypewriterText
-            text={EN_LINE}
-            startDelay={TYPE_START_DELAY}
-            charDelay={TYPE_CHAR_MS}
-            onComplete={() => setStep("holdA")}
-            className="font-serif font-normal"
-          />
-        )}
-        {step === "holdA" && (
-          <span className="font-serif font-normal whitespace-pre">{EN_LINE}</span>
-        )}
-        {step === "holdB" && (
-          <span className="font-song font-bold whitespace-pre">{ZH_LINE}</span>
-        )}
-        {step === "toB" && (
-          <ReplacingLine
-            from={EN_LINE}
-            to={ZH_LINE}
-            k={mainReplaceK}
-            fromClass="font-serif font-normal"
-            toClass="font-song font-bold"
-          />
-        )}
-        {step === "toA" && (
-          <ReplacingLine
-            from={ZH_LINE}
-            to={EN_LINE}
-            k={mainReplaceK}
-            fromClass="font-song font-bold"
-            toClass="font-serif font-normal"
-          />
-        )}
+        <span className={`whitespace-pre ${main.lang === 0 ? "font-serif font-normal" : "font-song font-bold"}`}>
+          {mainText.slice(0, main.len)}
+        </span>
       </p>
 
+      {/* Fixed ch-width box: both brand marks occupy exactly the same width */}
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <span className="font-mono font-bold text-white/40 text-[13px] tracking-wider">
-          {brandStep === "holdA" && BRAND_A}
-          {brandStep === "holdB" && BRAND_B}
-          {brandStep === "toB" && (
+        <span className="inline-block w-[13ch] text-center font-mono font-bold text-white/40 text-[13px] tracking-wider whitespace-pre">
+          {brand.k === 0 && (brand.show === "A" ? BRAND_A : BRAND_B)}
+          {brand.k > 0 && (
             <ReplacingLine
-              from={BRAND_A}
-              to={BRAND_B}
-              k={brandReplaceK}
-              fromClass=""
-              toClass=""
-            />
-          )}
-          {brandStep === "toA" && (
-            <ReplacingLine
-              from={BRAND_B}
-              to={BRAND_A}
-              k={brandReplaceK}
-              fromClass=""
-              toClass=""
+              from={brand.show === "A" ? BRAND_B : BRAND_A}
+              to={brand.show === "A" ? BRAND_A : BRAND_B}
+              k={brand.k}
             />
           )}
         </span>
