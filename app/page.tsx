@@ -7,10 +7,14 @@ import Navbar from "./components/Navbar";
 import ContactCard from "./components/ContactCard";
 import WeChatRedirect from "./components/WeChatRedirect";
 import ScrollFrameBackground from "./components/ScrollFrameBackground";
+import MaintenanceScreen from "./components/MaintenanceScreen";
 import { useScrollProgress } from "./hooks/useScrollProgress";
 import { useOrientationLock } from "./hooks/useOrientationLock";
 import { useLang } from "./context/LangContext";
 import { NAV_SECTIONS } from "./data/content";
+
+// ── Maintenance mode: show only the maintenance screen, gate everything else ──
+const MAINTENANCE_MODE = true;
 
 export default function Home() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +124,10 @@ export default function Home() {
     const sh = el.scrollHeight - el.clientHeight;
     el.scrollTo({ top: targetProgress * sh, behavior: "smooth" });
   }, []);
+
+  if (MAINTENANCE_MODE) {
+    return <MaintenanceScreen />;
+  }
 
   return (
     <main className="relative h-[100dvh] overflow-hidden">
