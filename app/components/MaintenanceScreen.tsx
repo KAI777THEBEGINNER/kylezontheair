@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const EN_LINE = "I'm currently editing my resume:)";
+const EN_LINE_1 = "I'm currently";
+const EN_LINE_2 = "editing my resume:)";
+const EN_LINE = EN_LINE_1 + EN_LINE_2; // timing counts across both segments
 const ZH_LINE = "简历正在更新中";
 const BRAND_A = "[KYLE ZHAO]";
 const BRAND_B = "[ByteDancing]";
@@ -95,11 +97,19 @@ export default function MaintenanceScreen() {
 
   return (
     <div className="fixed inset-0 z-[10001] bg-black flex flex-col items-center justify-center px-8 text-center">
-      {/* Fixed-height line so EN/ZH swaps don't shift the layout */}
-      <p className="h-[1.5em] flex items-center text-white text-[20px] md:text-[26px] tracking-wide">
-        <span className={`whitespace-pre ${main.lang === 0 ? "font-serif font-normal" : "font-song font-bold"}`}>
-          {mainText.slice(0, main.len)}
-        </span>
+      {/* Fixed-height block so EN/ZH swaps don't shift the layout; on mobile the
+          EN line breaks between "currently" and "editing" */}
+      <p className="min-h-[1.5em] flex items-center text-white text-[20px] md:text-[26px] tracking-wide text-center">
+        {main.lang === 0 ? (
+          <span className="whitespace-pre font-serif font-normal">
+            {mainText.slice(0, Math.min(main.len, EN_LINE_1.length))}
+            <br className="md:hidden" />
+            <span className="hidden md:inline">{main.len > EN_LINE_1.length ? " " : ""}</span>
+            {mainText.slice(EN_LINE_1.length, main.len)}
+          </span>
+        ) : (
+          <span className="whitespace-pre font-song font-bold">{mainText.slice(0, main.len)}</span>
+        )}
       </p>
 
       {/* Width locked by an invisible sizer of the widest mark; left-aligned typing
