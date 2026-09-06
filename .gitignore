@@ -51,3 +51,6 @@ data/rag-index.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vercel CLI accidental redirect artifact (contained an OIDC token once)
+/-
