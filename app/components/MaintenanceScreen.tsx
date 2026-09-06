@@ -6,6 +6,9 @@ const EN_LINE_1 = "I'm currently";
 const EN_LINE_2 = "editing my resume:)";
 const EN_LINE = EN_LINE_1 + EN_LINE_2; // timing counts across both segments
 const ZH_LINE = "简历正在更新中";
+const EN_LINE_3 = "will reopen soon:)";
+const ZH_LINE_2 = "欢迎下次再来";
+const MAIN_LINES = [EN_LINE, ZH_LINE, EN_LINE_3, ZH_LINE_2]; // EN→ZH→EN→ZH
 const BRAND_A = "[KYLE ZHAO]";
 const BRAND_B = "ByteDancing";
 
@@ -16,33 +19,31 @@ const HOLD_MS = 2400;
 const BRAND_START_DELAY = 3200; // offset from the main line so they never switch in sync
 const BRAND_TYPE_CHAR_MS = 40;
 
-/** Builds a pure timestamp→state function: type line 0 → hold → delete →
- *  type line 1 → hold → delete → loop. No chained timers, immune to
- *  background-tab throttling, self-corrects after the tab was hidden. */
+/** Builds a pure timestamp→state function: for each line — type → hold → delete —
+ *  then on to the next, looping. No chained timers, immune to background-tab
+ *  throttling, self-corrects after the tab was hidden. */
 function makeTypeDeleteTimeline(
-  lines: [string, string],
-  typeMs: [number, number],
+  lines: string[],
+  typeMs: number[],
   delMs: number,
   holdMs: number,
   startDelay: number
 ) {
-  const typeDur = [lines[0].length * typeMs[0], lines[1].length * typeMs[1]];
-  const delDur = [lines[0].length * delMs, lines[1].length * delMs];
-  const cycle = typeDur[0] + holdMs + delDur[0] + typeDur[1] + holdMs + delDur[1];
+  const typeDur = lines.map((l, i) => l.length * typeMs[i]);
+  const delDur = lines.map(l => l.length * delMs);
+  const cycle = typeDur.reduce((a, d, i) => a + d + holdMs + delDur[i], 0);
 
-  return (t: number): { lang: 0 | 1; len: number } => {
-    const u = Math.max(0, t - startDelay) % cycle;
-    if (u < typeDur[0]) return { lang: 0, len: Math.min(lines[0].length, Math.ceil(u / typeMs[0])) };
-    let v = u - typeDur[0];
-    if (v < holdMs) return { lang: 0, len: lines[0].length };
-    v -= holdMs;
-    if (v < delDur[0]) return { lang: 0, len: lines[0].length - 1 - Math.floor(v / delMs) };
-    v -= delDur[0];
-    if (v < typeDur[1]) return { lang: 1, len: Math.min(lines[1].length, Math.ceil(v / typeMs[1])) };
-    v -= typeDur[1];
-    if (v < holdMs) return { lang: 1, len: lines[1].length };
-    v -= holdMs;
-    return { lang: 1, len: lines[1].length - 1 - Math.floor(v / delMs) };
+  return (t: number): { lang: number; len: number } => {
+    let v = Math.max(0, t - startDelay) % cycle;
+    for (let i = 0; i < lines.length; i++) {
+      if (v < typeDur[i]) return { lang: i, len: Math.min(lines[i].length, Math.ceil(v / typeMs[i])) };
+      v -= typeDur[i];
+      if (v < holdMs) return { lang: i, len: lines[i].length };
+      v -= holdMs;
+      if (v < delDur[i]) return { lang: i, len: lines[i].length - 1 - Math.floor(v / delMs) };
+      v -= delDur[i];
+    }
+    return { lang: 0, len: 0 };
   };
 }
 
@@ -73,8 +74,8 @@ function useTimeline<T>(compute: (t: number) => T, key: (s: T) => string): T {
 }
 
 const mainStateAt = makeTypeDeleteTimeline(
-  [EN_LINE, ZH_LINE],
-  TYPE_CHAR_MS,
+  MAIN_LINES,
+  [TYPE_CHAR_MS[0], TYPE_CHAR_MS[1], TYPE_CHAR_MS[0], TYPE_CHAR_MS[1]],
   DELETE_CHAR_MS,
   HOLD_MS,
   TYPE_START_DELAY
@@ -92,11 +93,18 @@ export default function MaintenanceScreen() {
   const main = useTimeline(mainStateAt, s => `${s.lang}:${s.len}`);
   const brand = useTimeline(brandStateAt, s => `${s.lang}:${s.len}`);
 
-  const mainText = main.lang === 0 ? EN_LINE : ZH_LINE;
+  const mainText = MAIN_LINES[main.lang];
   const brandText = brand.lang === 0 ? BRAND_A : BRAND_B;
 
   return (
     <div className="fixed inset-0 z-[10001] bg-black flex flex-col items-center justify-center px-8 text-center">
+      {/* Favicon mark: horizontally centered, pinned to the top */}
+      <img
+        src="/icon.png"
+        alt="KYLE ZHAO"
+        className="absolute top-8 left-1/2 -translate-x-1/2 w-12 h-12 rounded-xl"
+      />
+
       {/* Fixed-height block so EN/ZH swaps don't shift the layout; on mobile the
           EN line breaks between "currently" and "editing" */}
       <p className="min-h-[1.5em] flex items-center text-white text-[20px] md:text-[26px] tracking-wide text-center">
@@ -108,7 +116,9 @@ export default function MaintenanceScreen() {
             {mainText.slice(EN_LINE_1.length, main.len)}
           </span>
         ) : (
-          <span className="whitespace-pre font-song font-bold">{mainText.slice(0, main.len)}</span>
+          <span className={`whitespace-pre ${main.lang % 2 === 0 ? "font-serif font-normal" : "font-song font-bold"}`}>
+            {mainText.slice(0, main.len)}
+          </span>
         )}
       </p>
 
