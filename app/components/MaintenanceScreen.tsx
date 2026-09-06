@@ -17,7 +17,9 @@ const TYPE_CHAR_MS: [number, number] = [45, 95]; // per-char delay: [EN, ZH]
 const DELETE_CHAR_MS = 28;
 const HOLD_MS = 2400;
 const BRAND_START_DELAY = 3200; // offset from the main line so they never switch in sync
-const BRAND_TYPE_CHAR_MS = 40;
+const BRAND_FLIP_MS = 300;      // one letter's flip duration
+const BRAND_STAGGER_MS = 70;    // delay between consecutive letters
+const BRAND_SWAP_MS = BRAND_A.length * BRAND_STAGGER_MS + BRAND_FLIP_MS;
 
 /** Builds a pure timestamp→state function: for each line — type → hold → delete —
  *  then on to the next, looping. No chained timers, immune to background-tab
@@ -81,20 +83,55 @@ const mainStateAt = makeTypeDeleteTimeline(
   TYPE_START_DELAY
 );
 
-const brandStateAt = makeTypeDeleteTimeline(
-  [BRAND_A, BRAND_B],
-  [BRAND_TYPE_CHAR_MS, BRAND_TYPE_CHAR_MS],
-  DELETE_CHAR_MS,
-  HOLD_MS,
-  BRAND_START_DELAY
-);
+/** Brand timeline: settled A → swap to B → settled B → swap to A → loop.
+ *  Swap renders per-letter flip-card animations (CSS-staggered), so the state
+ *  only needs to know whether we're mid-swap. */
+function brandStateAt(t: number): { show: "A" | "B"; swap: boolean } {
+  const period = 2 * (HOLD_MS + BRAND_SWAP_MS);
+  const u = Math.max(0, t - BRAND_START_DELAY) % period;
+  if (u < HOLD_MS) return { show: "A", swap: false };
+  if (u < HOLD_MS + BRAND_SWAP_MS) return { show: "B", swap: true };
+  if (u < 2 * HOLD_MS + BRAND_SWAP_MS) return { show: "B", swap: false };
+  return { show: "A", swap: true };
+}
+
+/** Per-letter flip-card swap: each changed letter flips 3D to reveal the new
+ *  character, staggered left → right; identical letters stay put. */
+function BrandFlip({ from, to, swap }: { from: string; to: string; swap: boolean }) {
+  if (!swap) return <>{to}</>;
+  const chars = [];
+  for (let i = 0; i < to.length; i++) {
+    if (from[i] === to[i]) {
+      chars.push(
+        <span key={i} className="inline-block whitespace-pre">{to[i]}</span>
+      );
+    } else {
+      chars.push(
+        <span key={i} className="relative inline-block whitespace-pre [perspective:300px]">
+          <span
+            className="inline-block whitespace-pre animate-brand-flip-out"
+            style={{ animationDelay: `${i * BRAND_STAGGER_MS}ms` }}
+          >
+            {from[i]}
+          </span>
+          <span
+            className="absolute inset-0 animate-brand-flip-in"
+            style={{ animationDelay: `${i * BRAND_STAGGER_MS}ms` }}
+          >
+            {to[i]}
+          </span>
+        </span>
+      );
+    }
+  }
+  return <>{chars}</>;
+}
 
 export default function MaintenanceScreen() {
   const main = useTimeline(mainStateAt, s => `${s.lang}:${s.len}`);
-  const brand = useTimeline(brandStateAt, s => `${s.lang}:${s.len}`);
+  const brand = useTimeline(brandStateAt, s => `${s.show}:${s.swap}`);
 
   const mainText = MAIN_LINES[main.lang];
-  const brandText = brand.lang === 0 ? BRAND_A : BRAND_B;
 
   return (
     <div className="fixed inset-0 z-[10001] bg-black flex flex-col items-center justify-center px-8 text-center">
@@ -122,15 +159,19 @@ export default function MaintenanceScreen() {
         )}
       </p>
 
-      {/* Width locked by an invisible sizer of the widest mark; left-aligned typing
-          means typed chars never move — no breathing, no subpixel jitter */}
+      {/* Width locked by an invisible sizer of the widest mark; per-letter
+          flip-card swap, staggered left → right */}
       <div className="absolute bottom-8 left-0 right-0 text-center">
         <span className="inline-grid font-mono font-bold text-white/40 text-[13px] tracking-wider whitespace-pre">
           <span className="invisible col-start-1 row-start-1" aria-hidden>
             {BRAND_B}
           </span>
           <span className="col-start-1 row-start-1 text-left">
-            {brandText.slice(0, brand.len)}
+            <BrandFlip
+              from={brand.show === "A" ? BRAND_B : BRAND_A}
+              to={brand.show === "A" ? BRAND_A : BRAND_B}
+              swap={brand.swap}
+            />
           </span>
         </span>
       </div>
