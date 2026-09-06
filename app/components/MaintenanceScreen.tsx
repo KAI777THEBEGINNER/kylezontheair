@@ -6,7 +6,7 @@ const EN_LINE_1 = "I'm currently";
 const EN_LINE_2 = "editing my resume:)";
 const EN_LINE = EN_LINE_1 + EN_LINE_2; // timing counts across both segments
 const ZH_LINE = "简历正在更新中";
-const BRAND_A = "KYLE ZHAO";
+const BRAND_A = "[KYLE ZHAO]";
 const BRAND_B = "ByteDancing";
 
 const TYPE_START_DELAY = 600;
