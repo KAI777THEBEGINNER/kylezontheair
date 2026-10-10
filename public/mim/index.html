@@ -96,7 +96,7 @@
   .chip b{color:var(--ink); font-variant-numeric:tabular-nums}
   .chip.hot{border-color:var(--accent); background:var(--accent-soft); color:var(--accent)}
   .chip.hot b{color:var(--accent)}
-  .changed{margin-top:16px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .changed{margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px}
   .changed div{background:var(--warn-soft); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent); border-radius:12px; padding:11px 13px; font-size:13.5px}
   .changed b{color:var(--warn)}
   @media (max-width:860px){.changed{grid-template-columns:1fr}}
@@ -281,7 +281,8 @@ const UI = {
     ],
     stepN:"STEP",
     chips:["Review each question <b>30 s</b>","Speak <b>150–165 s</b>","Hard limit <b>180 s</b>","Questions <b>5–6</b>","Result in <b>~15 working days</b>"],
-    changed:["<b>Fixed 10/10.</b> C2 point two is thinking for itself now, with the Feishu–Doubao call as the example.",
+    changed:["<b>Fixed 10/10.</b> New card: the wildcard — one lens (time) that fits any odd question.",
+             "<b>Fixed 10/10.</b> C2 point two is thinking for itself now, with the Feishu–Doubao call as the example.",
              "<b>Fixed 10/10.</b> The persuasion script now covers leading too: the intern squad, the UI pushback.",
              "<b>Fixed 10/10.</b> Low-frequency scripts (other programmes, the nuclear project) moved to the end."],
     tabs:["All","A · Person &amp; motive","B · Experience","C · Business","D · Open"],
@@ -327,7 +328,8 @@ const UI = {
     ],
     stepN:"第",
     chips:["每题看题 <b>30 秒</b>","开口说 <b>150–165 秒</b>","上限 <b>180 秒</b>","题量 <b>5–6 题</b>","结果约 <b>15 个工作日</b>"],
-    changed:["<b>10/10 已改。</b>C2 第二点是「有自己的判断」，例子用飞书并豆包那次决定。",
+    changed:["<b>10/10 新增。</b>万金油卡：一个镜头（时间），怪题都能套。",
+             "<b>10/10 已改。</b>C2 第二点是「有自己的判断」，例子用飞书并豆包那次决定。",
              "<b>10/10 已改。</b>说服稿现在同时覆盖带队：实习生小队、UI 那次分歧。",
              "<b>10/10 已改。</b>低频稿（其他项目、核电项目）挪到了列表末尾。"],
     tabs:["全部","A · 个人与动机","B · 经历与行为","C · 商业与专业","D · 开放与抽象"],
@@ -386,12 +388,12 @@ const LEAVES = [
                     zh:{t:"技术与商业",q:"能不能把泛词落到机制上",f:"稿：靠技术成功的公司"}},
   {id:"C5",b:"C",en:{t:"Your own observation",q:"Are you actually in the field.",f:"Your paid ads line — first-hand only"},
                     zh:{t:"你的商业观察",q:"你是真在场，还是背案例",f:"你所在的付费广告投放线，只用一手观察"}},
-  {id:"D1",b:"D",en:{t:"Invent and create",q:"Can you build something in 30 seconds.",f:"Script: Open questions, example one"},
-                    zh:{t:"虚构与创造",q:"30 秒能不能造出一个东西",f:"稿：开放怪题，例一"}},
-  {id:"D2",b:"D",en:{t:"Hypothetical choice",q:"What your value order is.",f:"Give an order, not a list. The four beats still work"},
-                    zh:{t:"假设与选择",q:"你的价值排序",f:"给顺序，别列清单；四拍照样能用"}},
-  {id:"D3",b:"D",en:{t:"Self-narrative",q:"How you tell your own story.",f:"Script: Open questions, example two"},
-                    zh:{t:"自我叙事",q:"你怎么讲自己",f:"稿：开放怪题，例二"}}
+  {id:"D1",b:"D",en:{t:"Invent and create",q:"Can you build something in 30 seconds.",f:"Script: Open questions — or run the time lens (D · wildcard)"},
+                    zh:{t:"虚构与创造",q:"30 秒能不能造出一个东西",f:"稿：开放怪题；任何怪题都能套万金油（时间）"}},
+  {id:"D2",b:"D",en:{t:"Hypothetical choice",q:"What your value order is.",f:"Give an order, not a list. The time lens covers this too"},
+                    zh:{t:"假设与选择",q:"你的价值排序",f:"给顺序，别列清单；也能套万金油（时间）"}},
+  {id:"D3",b:"D",en:{t:"Self-narrative",q:"How you tell your own story.",f:"Script: Open questions, or the time lens"},
+                    zh:{t:"自我叙事",q:"你怎么讲自己",f:"稿：开放怪题；也能套万金油（时间）"}}
 ];
 
 /* ================= SCRIPTS (spoken, in blocks) ================= */
@@ -640,6 +642,26 @@ const SCRIPTS = [
         labels:["四拍","例一","例二","可选回扣"],
         lines:[["先说你造的是什么东西。", "再说它由哪些部分组成，每部分代表什么。", "然后说这些部分合起来是什么意思。", "最后说你为什么想让它存在。"], ["我会做一个灯泡，连着三块拼图。", "灯泡是想法，三块拼图是技术、商业和人。", "意思很简单：好想法只有各部分凑到一起时才值钱。", "技术上很惊艳的产品，解决不了真问题也会失败。", "战略再好，团队执行不了也会失败。"], ["我会造一个「初稿节」，一年一天，只展示没做完的东西。", "那天不允许展出成品。", "我是影视出身，粗剪永远是救命的那一刻。", "所以这一天是让「早点出错」变成常态，而不是认罪。"], ["如果接得上，就加一句「事是怎么做成的」。"]],
         notes:["这里不评内容，只看你能不能把话说圆。","时间紧就取轻版：一个画面，三句话。"]}
+  },
+  {
+    id:"s-wild", code:"D · wildcard", kinds:["setup","setup","action","action","action"],
+    en:{t:"The wildcard: time", hear:"Any odd question. Invent a holiday, design an emoji, choose a superpower.",
+        spine:"The lens → Why it is mine → How to land it → Two examples",
+        keys:"time ｜ I give hours back ｜ past, present, or future ｜ first draft day ｜ the hourglass handed over",
+        blocks:[
+          {l:"The lens", lines:["When the question is strange, I run it through one lens: time.","Anything people invent is a container for time.","It remembers a past, marks a present, or promises a future."]},
+          {l:"Why it is mine", lines:["It is my lens because it is my work.","At Meituan, the tools gave each intern back three and a half hours a day.","At ByteDance, the agent saves the team about 80 hours a month.","So my first question about anything new is what it does to people's time."]},
+          {l:"How to land it", lines:["Three moves.","Name the time it holds: past, present, or future.","Say what it looks like.","Then say what it gives back."]},
+          {l:"Example: a festival", lines:["First Draft Day. One day a year for work that is half done.","Everything we celebrate is finished. The middle is where people quit.","So you show the unfinished version, out loud.","It gives the middle of the timeline a place. Managing a project is managing that middle."]},
+          {l:"Example: an emoji", lines:["An hourglass, handed from one hand to another.","It means: I saved this time, and it is yours now.","That is what our agent does for the team, so I know why it matters."]}
+        ],
+        notes:["Only for odd questions. One line to set the lens, then answer the question itself.","From the lens back to the actual answer: under thirty seconds.","Skip it for personal or factual questions. Forcing it sounds rehearsed.","Spare examples: a superpower — seeing where everyone's time actually goes. A treasure — one extra hour for a stranger."]},
+    zh:{t:"万金油：时间", hear:"任何怪题：造一个节日、设计一个 emoji、选一个超能力。",
+        spine:"镜头 → 为什么是我的 → 怎么接 → 两个例子",
+        keys:"时间 ｜ 我一直在给人省时间 ｜ 记住过去、标记现在、许诺未来 ｜ 初稿节 ｜ 递出去的沙漏",
+        labels:["镜头","为什么是我的","怎么接","例子：节日","例子：emoji"],
+        lines:[["题目怪的时候，我只用一个镜头来答：时间。", "人发明出来的任何东西，都是装时间的容器。", "它要么记住过去，要么标记现在，要么许诺未来。"], ["它之所以是我的镜头，因为这就是我在做的事。", "在美团，工具给每个实习生省回每天三个半小时。", "在字节，智能体给团队省下每月 80 小时。", "所以遇到任何新东西，我的第一个问题是：它对人的时间做了什么。"], ["三步。", "先说它装的是哪段时间：过去、现在，还是未来。", "再说它长什么样。", "最后说它给回什么。"], ["例子一，一个节日：初稿节——一年留一天，给没做完的东西。", "我们庆祝的都是完成品，而中途才是人放弃的地方。", "所以那一天，把没做完的版本拿出来，讲出来。", "它给时间轴的中段一个位置——管项目，管的就是中段。"], ["例子二，一个 emoji：一只沙漏，被一只手递给另一只手。", "它的意思是：这段时间我省下来了，现在归你。", "我们的智能体对团队做的就是这件事，所以我清楚它为什么重要。"]],
+        notes:["只在怪题上用。一句话点镜头，然后马上回到题目本身。", "从点镜头到真正答题，控制在三十秒以内。", "个人题、事实题不要套，硬套听起来像背的。", "备用例子：超能力→一眼看清每个人的时间花在哪；宝图→给陌生人多一个小时。"]}
   },
   {
     id:"s-others", code:"A4", kinds:["setup","setup","close"],
