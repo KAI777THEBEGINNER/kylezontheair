@@ -278,7 +278,7 @@ const UI = {
     ],
     stepN:"STEP",
     chips:["Review each question <b>30 s</b>","Speak <b>150–165 s</b>","Hard limit <b>180 s</b>","Questions <b>5–6</b>","Result in <b>~15 working days</b>"],
-    changed:["<b>Fixed 10/10.</b> C2 point two is now thinking for itself: do not follow the default playbook.",
+    changed:["<b>Fixed 10/10.</b> C2 point two is thinking for itself now, with the Feishu–Doubao call as the example.",
              "<b>Fixed 10/10.</b> The persuasion script now covers leading too: the intern squad, the UI pushback.",
              "<b>Fixed 10/10.</b> Low-frequency scripts (other programmes, the nuclear project) moved to the end."],
     tabs:["All","A · Person &amp; motive","B · Experience","C · Business","D · Open"],
@@ -324,7 +324,7 @@ const UI = {
     ],
     stepN:"第",
     chips:["每题看题 <b>30 秒</b>","开口说 <b>150–165 秒</b>","上限 <b>180 秒</b>","题量 <b>5–6 题</b>","结果约 <b>15 个工作日</b>"],
-    changed:["<b>10/10 已改。</b>C2 第二点改成「有自己的判断」：不照抄行业默认打法。",
+    changed:["<b>10/10 已改。</b>C2 第二点是「有自己的判断」，例子用飞书并豆包那次决定。",
              "<b>10/10 已改。</b>说服稿现在同时覆盖带队：实习生小队、UI 那次分歧。",
              "<b>10/10 已改。</b>低频稿（其他项目、核电项目）挪到了列表末尾。"],
     tabs:["全部","A · 个人与动机","B · 经历与行为","C · 商业与专业","D · 开放与抽象"],
@@ -586,17 +586,17 @@ const SCRIPTS = [
         blocks:[
           {l:"Answer", lines:["I'd describe it as three things.","And none of them is speed."]},
           {l:"One", lines:["First, can the company turn one-off success into a repeatable process?","At Meituan, our output improved because we wrote the workflows down, and judged them.","Not because someone worked harder."]},
-          {l:"Two", lines:["Second, can the company think for itself?","If everyone copies the same playbook, it stops being an advantage, and becomes the cost of staying in the game.","So I look for a team that will hold a different view, and test it.","In our team, that is why the definitions came first. A different view is only worth something if you can measure it."]},
+          {l:"Two", lines:["Second, can the company think for itself?","If everyone copies the same playbook, it stops being an advantage, and becomes the cost of staying in the game.","The test is a call the market finds strange. This July, ByteDance folded Feishu into Doubao, and Feishu was doing well.","The bet is that AI rewrites how people work, and that fight is not won from a standalone product."]},
           {l:"Three", lines:["Third, and this is the one people skip: how fast can the company tell whether something is working?","Every serious company stops a project that does not pay back. That is not a difference.","The difference is how long it takes to find out — two quarters or two weeks.","That is what measurement buys you.","If you cannot tell whether last month's change helped, you are deciding by opinion.","On our agent, the evaluation system is what kept that loop short."]},
           {l:"Close", lines:["So for me, competitiveness is process, thinking for itself, and a short feedback loop."]}
         ],
-        notes:["Say the three headings before the detail. They are the memory, not the examples.","On the second point, keep the emphasis on not following the crowd. The definitions story is the proof, not the headline.","Do not claim the decision alone; it was a team call, and \"we\" is accurate."]},
+        notes:["Say the three headings before the detail. They are the memory, not the examples.","On the second point, stay on not following the crowd. The Feishu case is public news, July 2026 — one line, framed as a bet, not as inside information.","Do not claim the decision alone; it was a team call, and \"we\" is accurate."]},
     zh:{t:"怎么保持竞争力", hear:"在一个快速变化的行业里，公司怎么保持竞争力？",
         spine:"结论 → 一 → 二 → 三 → 收口",
         keys:"流程化 ｜ 自己的判断 ｜ 多快能知道 ｜ 这三条都不是速度",
         labels:["结论","一","二","三","收口"],
-        lines:[["我会说三件事。", "而且都不是速度。"], ["第一，能不能把一次性的成功变成可复制的流程？", "在美团，我们的产出提升是因为把流程写下来并逐项判断。", "不是因为谁更拼。"], ["第二，这家公司有没有自己的判断？", "一个行业里所有人抄同一套打法，它就不再是优势，而是留在牌桌上的成本。", "所以我看一个团队敢不敢持有不同的观点，并且去验证它。", "在我们团队，这就是定义要先行的原因：不能衡量的不同观点，不值钱。"], ["第三，也是大家最容易忽略的：多快能知道一件事到底有没有用？", "正经公司都会停掉不划算的项目，这不是差别。", "差别是多久能看出来——两个季度，还是两周。", "这就是可衡量带来的东西。", "如果说不清上个月那次改动有没有用，那就是在靠感觉做决定。", "在我们的智能体上，评测体系就是把这条回路压短的东西。"], ["所以对我来说，竞争力是流程、自己的判断，和一条短的反馈回路。"]],
-        notes:["先报三个小标题，再展开。记住的是标题，不是例子。","第二点要落在「不跟风、自己有判断」上，追定义那段是证据，不是标题。","不要说成你一个人的决定，那是团队判断，「我们」是准确的。"]}
+        lines:[["我会说三件事。", "而且都不是速度。"], ["第一，能不能把一次性的成功变成可复制的流程？", "在美团，我们的产出提升是因为把流程写下来并逐项判断。", "不是因为谁更拼。"], ["第二，这家公司有没有自己的判断？", "一个行业里所有人抄同一套打法，它就不再是优势，而是留在牌桌上的成本。", "怎么看出来？看它敢不敢做一个外界觉得奇怪的决定。今年七月，字节把飞书并进了豆包，而飞书那时是蒸蒸日上的。", "他们的赌注是 AI 会重写办公，而这场仗不是从一个独立产品里打赢的。"], ["第三，也是大家最容易忽略的：多快能知道一件事到底有没有用？", "正经公司都会停掉不划算的项目，这不是差别。", "差别是多久能看出来——两个季度，还是两周。", "这就是可衡量带来的东西。", "如果说不清上个月那次改动有没有用，那就是在靠感觉做决定。", "在我们的智能体上，评测体系就是把这条回路压短的东西。"], ["所以对我来说，竞争力是流程、自己的判断，和一条短的反馈回路。"]],
+        notes:["先报三个小标题，再展开。记住的是标题，不是例子。","第二点只讲「不跟风、自己有判断」；飞书那件是公开报道（2026-07 内部信：飞书与豆包产品团队整合），一句话带过，说成公开的赌注，不要讲成内幕。","不要说成你一个人的决定，那是团队判断，「我们」是准确的。"]}
   },
   {
     id:"s-tech", code:"C4", kinds:["setup","setup","action","action","tension","close"],
