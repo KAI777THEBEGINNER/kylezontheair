@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview Console</title>
+<style>
+  :root{
+    --bg:#f7f6f3; --panel:#fffefc; --ink:#15171c; --ink-2:#565b6b; --ink-3:#8a90a0;
+    --line:#e3e0d8; --accent:#2f5fe0; --accent-soft:#e8eefc;
+    --ok:#0f7a45; --ok-soft:#e6f4ec; --warn:#a3540b; --warn-soft:#fdf1e2;
+    --rail:224px; --radius:14px;
+    --k-setup:#8a90a0; --k-tension:#c8791a; --k-action:#2f5fe0; --k-result:#0f7a45; --k-close:#5b3fd6;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,"PingFang SC","Hiragino Sans GB",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#131519; --panel:#181b21; --ink:#e9e7e2; --ink-2:#a7adbb; --ink-3:#767c8b;
+      --line:#282c34; --accent:#7ea2ff; --accent-soft:#1b2340;
+      --k-setup:#8d93a3; --k-tension:#e0a45c; --k-action:#7ea2ff; --k-result:#5fce92; --k-close:#a58bff;
+      --ok:#5fce92; --ok-soft:#12291e; --warn:#e2a35c; --warn-soft:#2c2216;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased}
+
+  /* ---------- left rail ---------- */
+  aside.rail{
+    position:fixed; top:0; left:0; bottom:0; width:var(--rail); z-index:30;
+    background:var(--panel); border-right:1px solid var(--line);
+    padding:18px 14px 24px; overflow-y:auto;
+  }
+  .rail-brand{font-weight:700; font-size:15px; letter-spacing:-.01em; line-height:1.3}
+  .rail-brand span{display:block; font-weight:500; font-size:12px; color:var(--ink-3); margin-top:2px}
+  .lang{display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; margin:14px 0 18px}
+  .lang button{font:inherit; font-size:12.5px; padding:4px 14px; border:0; background:transparent; color:var(--ink-3); cursor:pointer}
+  .lang button[aria-pressed="true"]{background:var(--ink); color:var(--bg)}
+  .rail nav{display:block}
+  .rail a{
+    display:block; font-size:13.5px; color:var(--ink-2); padding:5px 9px; border-radius:8px;
+    text-decoration:none; border-left:2px solid transparent;
+  }
+  .rail a:hover{background:var(--bg); color:var(--ink)}
+  .rail a.on{color:var(--accent); border-left-color:var(--accent); background:var(--accent-soft)}
+  .rail .sec{font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:var(--ink-3); margin:16px 0 6px; padding-left:9px}
+  .rail a.sub{font-size:13px; padding-left:18px; color:var(--ink-3)}
+  .rail a.sub.on{color:var(--accent)}
+  .rail-head{margin-top:22px}
+
+  .content{margin-left:var(--rail)}
+  main{max-width:1060px; margin:0 auto; padding:34px 30px 90px}
+  section{margin:0 0 48px; scroll-margin-top:24px}
+  h2{font-size:13px; text-transform:uppercase; letter-spacing:.13em; color:var(--ink-3); margin:0 0 14px; font-weight:600}
+  h2 b{color:var(--ink)}
+  .lead{font-size:17px; color:var(--ink-2); margin:-4px 0 24px; max-width:70ch}
+
+  @media (max-width:1000px){
+    aside.rail{position:sticky; top:0; width:auto; border-right:0; border-bottom:1px solid var(--line); padding:10px 16px 8px; background:var(--panel)}
+    .content{margin-left:0}
+    .rail-top{display:flex; align-items:center; justify-content:space-between; gap:12px}
+    .rail-brand{font-size:14px}
+    .rail-brand span{display:none}
+    .lang{margin:0}
+    .rail nav{display:flex; gap:4px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch}
+    .rail a{border-left:0; border-bottom:2px solid transparent; white-space:nowrap; padding:6px 10px}
+    .rail a.on{border-left:0; border-bottom-color:var(--accent)}
+    .rail .sec,.rail-head{display:none}
+    main{padding:24px 18px 70px}
+  }
+
+  /* ---------- loop ---------- */
+  .loop{display:grid; grid-template-columns:repeat(5,1fr); gap:10px}
+  .step{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px; position:relative; min-height:128px}
+  .step .n{font-family:var(--mono); font-size:11px; color:var(--ink-3); display:block; margin-bottom:8px}
+  .step h3{margin:0 0 6px; font-size:15.5px}
+  .step p{margin:0; font-size:13.5px; color:var(--ink-2); line-height:1.45}
+  .step.key{border-color:var(--accent); background:var(--accent-soft)}
+  .step.key h3{color:var(--accent)}
+  .step:not(:last-child)::after{content:"→"; position:absolute; right:-11px; top:50%; transform:translateY(-50%); color:var(--ink-3); background:var(--bg); padding:2px 0}
+  @media (max-width:860px){ .loop{grid-template-columns:1fr 1fr} .step:not(:last-child)::after{content:""} }
+
+  .day{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:12px; padding:16px 18px; margin-bottom:18px}
+  .day h3{margin:0 0 6px; font-size:15px}
+  .day .deadline{font-family:var(--mono); font-size:12.5px; color:var(--warn); margin:0 0 12px; letter-spacing:.01em}
+  .day ul{margin:0; padding-left:20px; font-size:13.5px; color:var(--ink-2); columns:2; column-gap:26px}
+  .day li{margin:0 0 5px; break-inside:avoid}
+  .day a{font-family:var(--mono); font-size:12.5px}
+  @media (max-width:760px){ .day ul{columns:1} }
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
+  .chip{background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 13px; font-size:13.5px; color:var(--ink-2)}
+  .chip b{color:var(--ink); font-variant-numeric:tabular-nums}
+  .chip.hot{border-color:var(--accent); background:var(--accent-soft); color:var(--accent)}
+  .chip.hot b{color:var(--accent)}
+  .changed{margin-top:16px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .changed div{background:var(--warn-soft); border:1px solid color-mix(in srgb, var(--warn) 30%, transparent); border-radius:12px; padding:11px 13px; font-size:13.5px}
+  .changed b{color:var(--warn)}
+  @media (max-width:860px){.changed{grid-template-columns:1fr}}
+
+  /* ---------- tree ---------- */
+  .treenote{border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:10px; padding:12px 15px; margin:-8px 0 18px; font-size:13.5px; color:var(--ink-2); max-width:88ch}
+  .treenote b{color:var(--ink)}
+  .tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px}
+  .tabs button{font:inherit; font-size:13.5px; cursor:pointer; padding:7px 14px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink-2)}
+  .tabs button:hover{color:var(--ink)}
+  .tabs button[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+  .branch-title{display:flex; align-items:baseline; gap:10px; margin:22px 0 12px}
+  .branch-title h3{margin:0; font-size:15px}
+  .branch-title span{font-size:13px; color:var(--ink-3)}
+  .leaves{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px}
+  .leaf{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px}
+  .leaf .id{font-family:var(--mono); font-size:11.5px; color:var(--accent); display:block; margin-bottom:4px}
+  .leaf h4{margin:0 0 4px; font-size:14.5px}
+  .leaf .tests{margin:0 0 8px; font-size:13px; color:var(--ink-2)}
+  .leaf .fill{font-size:12.5px; color:var(--ink-2); border-top:1px dashed var(--line); padding-top:7px}
+  .leaf .fill b{color:var(--ink)}
+
+  /* ---------- stories ---------- */
+  .stories{display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:12px}
+  .story{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px}
+  .story h3{margin:0 0 2px; font-size:15.5px}
+  .story .tag{font-size:12.5px; color:var(--ink-3); margin-bottom:10px; display:block}
+  .story ul{margin:0 0 12px; padding-left:18px; font-size:13.5px; color:var(--ink-2)}
+  .story li{margin:3px 0}
+  .story .close{font-size:13.5px; font-style:italic; border-left:3px solid var(--accent); padding-left:11px; margin:0}
+
+  /* ---------- spines ---------- */
+  .spines{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-bottom:20px}
+  .spine{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:13px 15px}
+  .spine h3{margin:0 0 3px; font-size:14.5px}
+  .spine .use{font-size:12.5px; color:var(--accent); margin-bottom:7px}
+  .spine p{margin:0; font-size:13px; color:var(--ink-2); line-height:1.5}
+  .frames{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px}
+  .frame{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:13px 15px}
+  .frame h4{margin:0 0 8px; font-size:12.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--ink-3)}
+  .frame p{margin:0 0 8px; font-size:13.5px; font-family:var(--mono); line-height:1.5}
+  .gloss{display:block; font-family:var(--sans); font-size:12.5px; color:var(--ink-3); margin-top:3px}
+
+  /* ---------- scripts ---------- */
+  .scriptbar{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .scriptbar .count{font-size:13px; color:var(--ink-3)}
+  .scriptbar button{font:inherit; font-size:13px; padding:5px 12px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink-2); cursor:pointer}
+  details.script{background:var(--panel); border:1px solid var(--line); border-radius:12px; margin-bottom:10px; overflow:hidden; scroll-margin-top:20px}
+  details.script[open]{border-color:color-mix(in srgb, var(--accent) 45%, var(--line))}
+  details.script summary{cursor:pointer; padding:14px 16px; list-style:none; display:block}
+  details.script summary::-webkit-details-marker{display:none}
+  .stitle{display:flex; align-items:center; gap:10px; font-weight:600; font-size:15.5px}
+  .stitle .code{font-family:var(--mono); font-size:11.5px; color:var(--accent); font-weight:500}
+  .stitle .plus{margin-left:auto; font-family:var(--mono); color:var(--accent); font-size:13px}
+  .shell{font-size:13px; color:var(--ink-3); margin:4px 0 0 0}
+  .k-setup{--kc:var(--k-setup)} .k-tension{--kc:var(--k-tension)} .k-action{--kc:var(--k-action)}
+  .k-result{--kc:var(--k-result)} .k-close{--kc:var(--k-close)}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; margin:0 0 14px; font-size:12.5px; color:var(--ink-2)}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .legend i{width:11px; height:11px; border-radius:3px; background:var(--kc); display:block}
+  .sbody{padding:2px 16px 18px; border-top:1px dashed var(--line)}
+  .keys{font-family:var(--mono); font-size:12.5px; color:var(--ink-2); background:var(--accent-soft); border-radius:9px; padding:9px 12px; margin:14px 0 16px; line-height:1.7}
+  .board{display:grid; grid-template-columns:repeat(auto-fill,minmax(272px,1fr)); gap:12px; margin-top:16px; align-items:start}
+  .blk{position:relative; background:color-mix(in srgb, var(--kc) 6%, var(--panel)); border:1px solid var(--line); border-radius:14px; padding:15px 16px 16px; box-shadow:0 1px 2px rgba(0,0,0,.035); transition:opacity .18s, transform .18s, box-shadow .18s; cursor:pointer}
+  .bhead{display:flex; align-items:center; gap:9px; margin:0 0 11px}
+  .spine-line{font-size:12.5px; color:var(--ink-3); margin:9px 0 0; letter-spacing:.01em}
+  .bnum{font-family:var(--mono); font-size:11.5px; width:23px; height:23px; border-radius:50%; background:var(--kc); color:#fff; display:grid; place-items:center; flex:none}
+  .blab{font-size:12.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--kc)}
+  .blk p{margin:0 0 8px; font-size:15.5px; line-height:1.5}
+  .blk p.zh{margin:0 0 3px}
+  .blk p.sub{font-size:13px; color:var(--ink-3); line-height:1.45; margin:0 0 9px}
+  .blk p:last-child{margin-bottom:0}
+  .board.focusing .blk{opacity:.28}
+  .board.focusing .blk.focus{opacity:1; transform:translateY(-2px); box-shadow:0 8px 22px rgba(0,0,0,.10)}
+  .focushint{font-size:12.5px; color:var(--ink-3); margin:12px 0 0}
+  .claimtable{width:100%; border-collapse:collapse; margin-top:16px; font-size:13.5px}
+  .claimtable th{text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); padding:0 12px 6px 0; border-bottom:1px solid var(--line)}
+  .claimtable td{padding:9px 12px 9px 0; border-bottom:1px solid var(--line); color:var(--ink-2); vertical-align:top}
+  .claimtable td.q{color:var(--ink); font-style:italic}
+  .script-note{font-size:13px; color:var(--warn); margin:14px 0 0}
+
+
+  /* ---------- drill ---------- */
+  .drill{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:22px; display:grid; grid-template-columns:1.1fr .9fr; gap:26px}
+  @media (max-width:820px){.drill{grid-template-columns:1fr}}
+  .qtext{font-size:20px; line-height:1.45; margin:0 0 16px}
+  .btn{font:inherit; font-size:14px; cursor:pointer; border-radius:10px; padding:9px 16px; border:1px solid var(--ink); background:var(--ink); color:var(--bg); font-weight:600}
+  .btn.ghost{background:transparent; color:var(--ink); border-color:var(--line)}
+  .btn:disabled{opacity:.45; cursor:not-allowed}
+  .btnrow{display:flex; gap:8px; flex-wrap:wrap}
+  .guess{display:flex; gap:8px; flex-wrap:wrap; margin:14px 0}
+  .guess button{font:inherit; font-size:13.5px; cursor:pointer; padding:8px 13px; border-radius:9px; border:1px solid var(--line); background:var(--bg); color:var(--ink)}
+  .guess button.right{border-color:var(--ok); background:var(--ok-soft); color:var(--ok)}
+  .guess button.wrong{border-color:var(--warn); background:var(--warn-soft); color:var(--warn)}
+  .feedback{font-size:13.5px}
+  .feedback b{color:var(--ok)}
+  .feedback i{color:var(--warn); font-style:normal}
+  .metre{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:16px; align-self:start}
+  .metre h4{margin:0 0 12px; font-size:12.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--ink-3)}
+  .clock{font-family:var(--mono); font-size:40px; font-variant-numeric:tabular-nums; line-height:1}
+  .clock small{font-size:14px; color:var(--ink-3); margin-left:6px}
+  .bar{height:9px; background:var(--line); border-radius:99px; margin:14px 0 6px; overflow:hidden; position:relative}
+  .bar i{display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .25s linear}
+  .bar.speaking i{background:var(--ok)}
+  .bar .mark{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink-3); opacity:.5}
+  .metre .hint{font-size:12.5px; color:var(--ink-3)}
+  .stat{font-size:13px; color:var(--ink-2); margin-top:14px; border-top:1px dashed var(--line); padding-top:10px}
+  footer{max-width:1060px; margin:0 auto; padding:0 30px 60px; color:var(--ink-3); font-size:12.5px}
+  @media print{ aside.rail{display:none} .content{margin-left:0} .drill{display:none} }
+</style>
+</head>
+<body>
+
+<aside class="rail">
+  <div class="rail-top">
+    <div class="rail-brand" id="brand"></div>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="lang-en" aria-pressed="true">EN</button>
+      <button id="lang-zh" aria-pressed="false">中文</button>
+    </div>
+  </div>
+  <nav id="railnav"></nav>
+</aside>
+
+<div class="content">
+  <main>
+    <section id="day"><h2 id="day-h"></h2><div class="day" id="day-box"></div></section>
+    <section id="loop"><h2 id="loop-h"></h2><p class="lead" id="loop-lead"></p><div class="loop" id="loop-grid"></div><div class="chips" id="chips"></div><div class="changed" id="changed"></div></section>
+    <section id="tree"><h2 id="tree-h"></h2><p class="lead" id="tree-lead"></p><p class="treenote" id="tree-note"></p><div class="tabs" id="tabs"></div><div id="tree-body"></div></section>
+    <section id="stories"><h2 id="stories-h"></h2><p class="lead" id="stories-lead"></p><div class="stories" id="story-grid"></div></section>
+    <section id="spines"><h2 id="spines-h"></h2><p class="lead" id="spines-lead"></p><div class="spines" id="spine-grid"></div><div class="frames" id="frame-grid"></div></section>
+    <section id="scripts"><h2 id="scripts-h"></h2><p class="lead" id="scripts-lead"></p>
+      <div class="legend" id="legend"></div>
+      <div class="scriptbar"><button id="togall"></button><span class="count" id="scount"></span></div>
+      <div id="script-list"></div>
+    </section>
+    <section id="drill"><h2 id="drill-h"></h2><p class="lead" id="drill-lead"></p>
+      <div class="drill">
+        <div>
+          <p class="qtext" id="qtext"></p>
+          <div class="btnrow"><button class="btn" id="draw"></button><button class="btn ghost" id="again" style="display:none"></button></div>
+          <div class="guess" id="guess" style="display:none"></div>
+          <p class="feedback" id="feedback"></p>
+        </div>
+        <div class="metre">
+          <h4 id="clock-h"></h4>
+          <div class="clock" id="clock"></div>
+          <div class="bar" id="bar"><span class="mark" style="left:100%"></span><i id="fill"></i></div>
+          <p class="hint" id="hint"></p>
+          <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="prep" disabled></button><button class="btn ghost" id="speak" disabled></button></div>
+          <div class="stat"><span id="stats"></span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer id="foot"></footer>
+</div>
+
+<script>
+/* ================= UI ================= */
+const UI = {
+  en:{
+    brand:"Interview Console<span>CUHK MiM · 2026-10-10</span>",
+    sec:["The loop","The question tree","Six stories","Spines and sentence frames","Scripts","The drill"],
+    daySec:"On the day",
+    dayTitle:"The interview link is live",
+    dayDeadline:"Link expires 17:00 HKT, Sunday 11 October. Do it early, not at the last minute.",
+    daySteps:["Open <a href=\"https://myint.video/avP3k_qgO2\">myint.video/avP3k_qgO2</a> in Chrome or Firefox, in a private window.",
+              "Check your name. Then test camera and microphone in Practice mode. Practice answers are not submitted.",
+              "5–6 questions. You get 30 seconds to review each one, then recording starts by itself.",
+              "One attempt per question. No pause, no restart, no going back.",
+              "Your face must be visible, or the submission is invalid.",
+              "At the end press Submit and wait for the confirmation message."],
+    dayHelp:"Problems during recording: candidates@myinterview.com, 24 hours a day.",
+    leads:[
+      "Every answer runs the same five steps. You get 30 seconds to review the question before recording starts, so the loop has to fit inside that.",
+      "Every question lands on one branch. Name the branch first, then everything else follows.",
+      "Not scripts. The facts you can reach for, plus the one line that closes each one.",
+      "The spine decides the shape of the answer. The frames are whole sentences you can start with, so you never freeze mid-thought.",
+      "Each script is cut into blocks. The blocks are the spine, so learn the block names first and the sentences second. Say them out loud; every line is short enough for one breath.",
+      "Draw a question, name its branch, then run the clock the way the interview does."
+    ],
+    stepN:"STEP",
+    chips:["Review each question <b>30 s</b>","Speak <b>150–165 s</b>","Hard limit <b>180 s</b>","Questions <b>5–6</b>","Result in <b>~15 working days</b>"],
+    changed:["<b>Fixed 10/10.</b> The persuasion script now covers leading too: the intern squad, the UI pushback.",
+             "<b>Fixed 10/10.</b> Low-frequency scripts (other programmes, the nuclear project) moved to the end.",
+             "<b>Fixed 10/9.</b> The nav bar now stays visible when the window gets small."],
+    tabs:["All","A · Person &amp; motive","B · Experience","C · Business","D · Open"],
+    treeNote:"<b>Four parallel buckets.</b> The platform draws up to two questions from each bucket, so when a question is asked it belongs to one branch. The leaves overlap, though: \"why did you switch from film to management\" sits on A1 or A2, and \"a problem you solved with almost no resources\" sits on B1 or B3. When two leaves fit, take the one where your story is strongest and answer in that shape. The same question never repeats inside one interview; two different leaves from the same bucket can both come up.",
+    fillLabel:"Use", useLabel:"Use:", watchLabel:"Watch out:", sits:"It sits on", correct:"Yes —",
+    keyLabel:"Keyword map", hearLabel:"You'll hear", spineLabel:"Spine",
+    draw:"Draw a question", again:"Next question", prep:"Start prep", speak:"Start speaking",
+    clockH:"Clock", prepUnit:"s prep", speakUnit:"s speaking",
+    hintIdle:"Pick the branch first. Then run the prep clock.",
+    hintPrep:"Three words on paper: verdict, story, close.",
+    hintSpeaking:"Target 150–165 s. The mark shows 150 s. Stop by 180 s.",
+    hintTimePrep:"Time. Now speak — aim for 150 to 165 seconds.",
+    hintTimeSpeak:"Time. That is the limit, not the target.",
+    statOne:"question drawn this session.", statMany:"questions drawn this session.",
+    idle:"Press draw. One question at a time.",
+    expand:"Expand all", collapse:"Collapse all",
+    scount:" scripts · cut into blocks",
+    legend:["Setup","Tension","Action","Result","Close"],
+    focusHint:"Click a block to practise it alone. Click it again to go back.",
+    foot:"Revised 2026-10-10 · squad story covers persuasion and leading · low-frequency scripts at the end.",
+    navSec:"Sections", navScripts:"Scripts"
+  },
+  zh:{
+    brand:"面试作战台<span>CUHK MiM · 2026-10-10</span>",
+    sec:["一次回答：五步走完","问题树：四大类，十六个叶子","六块素材","骨架与英文句式","英文稿（分块）","抽题练习"],
+    daySec:"当天流程",
+    dayTitle:"面试链接已到手",
+    dayDeadline:"链接 10 月 11 日（周日）17:00 香港时间失效。早做，别拖到最后一刻。",
+    daySteps:["用 Chrome 或 Firefox 的无痕窗口打开 <a href=\"https://myint.video/avP3k_qgO2\">myint.video/avP3k_qgO2</a>。",
+              "先核对姓名，再进 Practice 模式试摄像头和麦克风；练习的答案不会被提交。",
+              "5-6 道题。每题 30 秒看题时间，时间到自动开始录。",
+              "每题只能答一次：不能暂停、不能重来、不能回看。",
+              "必须开摄像头、脸要清楚，否则算无效提交。",
+              "全部答完点 Submit，等到出现提交成功的提示再关页面。"],
+    dayHelp:"录制中出问题：candidates@myinterview.com（24 小时在线）。",
+    leads:[
+      "每道题都走同一条流水线。看题 30 秒后自动开录，所以这五步必须挤进 30 秒里。",
+      "每道题都落在某一根枝上。先把枝子认出来，后面就顺了。",
+      "不是稿子，是随时能拿来用的事实，加一句收口。收口句背下来，别背整段。",
+      "骨架决定回答的形状；句式是整句现成的话，卡壳时直接开口用。",
+      "每篇稿都切成小块。块的名字就是骨架——先记块名，再记句子。所有句子都短到一口气能说完，一定要出声念。",
+      "抽一道题，先判它属于哪一类，再按面试的节奏走表。"
+    ],
+    stepN:"第",
+    chips:["每题看题 <b>30 秒</b>","开口说 <b>150–165 秒</b>","上限 <b>180 秒</b>","题量 <b>5–6 题</b>","结果约 <b>15 个工作日</b>"],
+    changed:["<b>10/10 已改。</b>说服稿现在同时覆盖带队：实习生小队、UI 那次分歧。",
+             "<b>10/10 已改。</b>低频稿（其他项目、核电项目）挪到了列表末尾。",
+             "<b>10/9 已改。</b>窗口缩小时，导航栏保持可见。"],
+    tabs:["全部","A · 个人与动机","B · 经历与行为","C · 商业与专业","D · 开放与抽象"],
+    treeNote:"<b>四类并列的桶。</b>系统从每个桶里最多抽两道，所以一道题当场只属于一根枝。但叶子之间有重叠：「为什么从影视跨到管理」落在 A1 或 A2 都说得通；「几乎没有资源怎么解决问题」落在 B1 或 B3 都说得通。两个都通时，挑你素材最强的那根，按它的形状答。同一场里同一道题不会重复；同一个桶里的两个不同叶子可能都出现。",
+    fillLabel:"用", useLabel:"用：", watchLabel:"别踩：", sits:"它属于", correct:"对了——",
+    keyLabel:"关键词", hearLabel:"你会听到", spineLabel:"骨架",
+    draw:"抽一道题", again:"下一题", prep:"开始准备", speak:"开始说",
+    clockH:"计时", prepUnit:"秒 准备", speakUnit:"秒 说",
+    hintIdle:"先点一个树枝，再走准备计时。",
+    hintPrep:"纸上写三个词：结论、素材、收口。",
+    hintSpeaking:"目标 150-165 秒，刻度线是 150 秒；180 秒前停下。",
+    hintTimePrep:"时间到。开始说，目标 150 到 165 秒。",
+    hintTimeSpeak:"时间到。这是上限，不是目标。",
+    statOne:" 道题（本次）。", statMany:" 道题（本次）。",
+    idle:"按下面的按钮抽题。一次一道。",
+    expand:"全部展开", collapse:"全部收起",
+    scount:" 篇稿 · 每篇按块切好",
+    legend:["铺垫","张力","动作","结果","收口"],
+    focusHint:"点一块，就只练那一块；再点一次回到全部。",
+    foot:"2026-10-10 修订 · 小队一篇覆盖说服与带队 · 低频稿在末尾。",
+    navSec:"目录", navScripts:"英文稿"
+  }
+};
+
+const BRANCH = {
+  A:{en:{name:"A · Person and motive",hint:"who you are, where you go"}, zh:{name:"A · 个人与动机",hint:"你是谁，要去哪"}},
+  B:{en:{name:"B · Experience and behaviour",hint:"what you did, how you did it"}, zh:{name:"B · 经历与行为",hint:"你做过什么，怎么做"}},
+  C:{en:{name:"C · Business and profession",hint:"how you read a business"}, zh:{name:"C · 商业与专业",hint:"你怎么看生意"}},
+  D:{en:{name:"D · Open and abstract",hint:"can you stay coherent"}, zh:{name:"D · 开放与抽象",hint:"临时造一个还能自洽吗"}}
+};
+
+const LEAVES = [
+  {id:"A1",b:"A",en:{t:"Introduction and motive",q:"Is there a through-line, not a CV list.",f:"Script: Introduction and motive"},
+                    zh:{t:"自我介绍与动机",q:"有没有一条主线，而不是 CV 清单",f:"稿：自我介绍与动机"}},
+  {id:"A2",b:"A",en:{t:"Career plan",q:"Do the plan and the programme feed each other.",f:"Script: Career plan"},
+                    zh:{t:"职业规划",q:"规划和项目是不是互为因果",f:"稿：职业规划"}},
+  {id:"A3",b:"A",en:{t:"Self-awareness",q:"Can you calibrate yourself.",f:"Script: Three words"},
+                    zh:{t:"自我认知",q:"你能不能自我校准",f:"稿：三个词形容自己"}},
+  {id:"A4",b:"A",en:{t:"Fit and loyalty",q:"Do you know what you applied to, and will you come.",f:"Script: Other programmes"},
+                    zh:{t:"匹配与忠诚",q:"你知不知道自己在申请什么，会不会来",f:"稿：还申请了哪些项目"}},
+  {id:"B1",b:"B",en:{t:"Challenge and solution",q:"Your actions, not your bad luck.",f:"Script: Internship challenge (ByteDance)"},
+                    zh:{t:"挑战与解决",q:"看你的动作，不看你的遭遇",f:"稿：实习里最大的挑战（字节）"}},
+  {id:"B2",b:"B",en:{t:"Teamwork and disagreement",q:"How you push a view through conflict.",f:"Script: Persuasion and leading, plus Teamwork"},
+                    zh:{t:"协作与分歧",q:"冲突里你怎么把想法推进",f:"稿：说服与带队，再加团队合作"}},
+  {id:"B3",b:"B",en:{t:"Leadership and ownership",q:"Why people follow you.",f:"Script: Persuasion and leading — the intern squad story"},
+                    zh:{t:"领导与担当",q:"别人凭什么跟你走",f:"用「说服与带队」那篇——实习生小队那段"}},
+  {id:"B4",b:"B",en:{t:"Achievement and feedback",q:"How you define a result.",f:"Script: An achievement. No failure story yet — build one before the real interview"},
+                    zh:{t:"成就与反馈",q:"你怎么定义结果",f:"稿：最有成就感的事。失败题还没稿，正式面试前补一个"}},
+  {id:"C1",b:"C",en:{t:"Trends and change",q:"Your own observation, not the news.",f:"Script: A trend you're watching"},
+                    zh:{t:"趋势与变化",q:"有没有你自己的观察，不是复述新闻",f:"稿：你在关注的趋势"}},
+  {id:"C2",b:"C",en:{t:"Competitiveness and strategy",q:"Can you explain results with organisation.",f:"Script: Staying competitive"},
+                    zh:{t:"竞争力与战略",q:"能不能从组织层面解释结果",f:"稿：怎么保持竞争力"}},
+  {id:"C3",b:"C",en:{t:"Brand and customer",q:"Do you argue with metrics.",f:"Script: Staying competitive, then the brand block from the ammo file"},
+                    zh:{t:"品牌与顾客",q:"会不会用指标说话",f:"用「怎么保持竞争力」，再借弹药库里的品牌那块"}},
+  {id:"C4",b:"C",en:{t:"Technology and business",q:"Can you ground a vague word.",f:"Script: A company that won on technology"},
+                    zh:{t:"技术与商业",q:"能不能把泛词落到机制上",f:"稿：靠技术成功的公司"}},
+  {id:"C5",b:"C",en:{t:"Your own observation",q:"Are you actually in the field.",f:"Your paid ads line — first-hand only"},
+                    zh:{t:"你的商业观察",q:"你是真在场，还是背案例",f:"你所在的付费广告投放线，只用一手观察"}},
+  {id:"D1",b:"D",en:{t:"Invent and create",q:"Can you build something in 30 seconds.",f:"Script: Open questions, example one"},
+                    zh:{t:"虚构与创造",q:"30 秒能不能造出一个东西",f:"稿：开放怪题，例一"}},
+  {id:"D2",b:"D",en:{t:"Hypothetical choice",q:"What your value order is.",f:"Give an order, not a list. The four beats still work"},
+                    zh:{t:"假设与选择",q:"你的价值排序",f:"给顺序，别列清单；四拍照样能用"}},
+  {id:"D3",b:"D",en:{t:"Self-narrative",q:"How you tell your own story.",f:"Script: Open questions, example two"},
+                    zh:{t:"自我叙事",q:"你怎么讲自己",f:"稿：开放怪题，例二"}}
+];
+
+/* ================= SCRIPTS (spoken, in blocks) ================= */
+/* lines are what you say: English in both languages. labels and notes translate. */
+const SCRIPTS = [
+  {
+    id:"s-intro", code:"A1 · first question", kinds:["setup","action","action","tension","result","close","close"],
+    en:{t:"Introduction and motive", hear:"Tell me about yourself, and what attracts you to this programme.",
+        spine:"Open → What I've done → Studio → (Academic) → What it taught me → Why here → Ahead",
+        keys:"straight to the internships ｜ one line each ｜ one line for the studio ｜ what it taught you ｜ why this programme ｜ where you're going",
+        blocks:[
+          {l:"Open", lines:["Good morning. My name is Ziqi Zhao.","I'm a final-year student at Sichuan University."]},
+          {l:"What I've done", lines:["My interest came from two internships, not from my major.","At Meituan, I built eight internal tools for the operations team.","They covered 83% of our interns' work.","That freed three and a half to four and a half hours a day, per person.","Right now I'm interning at ByteDance, working on an agent for our paid ads business.","It saves the team about 80 hours a month."]},
+          {l:"Studio", lines:["I also co-founded a small media studio.","There, I used data to judge how well our content performed.","That supported our clients' commercial decisions."]},
+          {l:"Academic (optional)", lines:["In one competition, I made the film and the deck for a nuclear diagnostics project.","My part was presentation. The business case was the team's."]},
+          {l:"What it taught me", lines:["Both places taught me the same thing.","Technology only creates value when it meets a real need, fits the business, and gets executed well."]},
+          {l:"Why here", lines:["That's why I'm applying to the MiM programme.","I want to strengthen the parts I have not studied, strategic management, organisational behaviour, and business decision making.","I'm also drawn to the digital economy courses, and the International Capstone Project."]},
+          {l:"Ahead", lines:["In the future, I hope to become a product or business strategy professional.","Someone who can bridge technology and management, and help turn innovation into lasting growth."]}
+        ],
+        notes:["Target 1 to 1.5 minutes. Do not open with your major; greet, then go straight to the internships.","The studio gets one block and no more. Drop the academic block if you are short of time.","Name what you want to learn: strategy, organisational behaviour, business decision making.","Do not detail the CV. Say what each experience gave you, not what you were assigned."]},
+    zh:{t:"自我介绍与动机", hear:"介绍一下你自己，以及这个项目最吸引你什么。",
+        spine:"开场 → 我做过什么 → 工作室 → 它教了我什么 → 为什么是这个项目 → 未来",
+        keys:"直接切实习 ｜ 两段各一句 ｜ 工作室一句 ｜ 它教了你什么 ｜ 为什么这个项目 ｜ 你要去哪",
+        labels:["开场","我做过什么","工作室","学术（可选）","它教了我什么","为什么这里","未来"],
+        lines:[["早上好，我叫赵梓淇。", "我是四川大学的大四学生。"], ["我的兴趣来自实习，不是来自专业。", "在美团，我为运营团队做了八款内部工具。", "覆盖了实习生 83% 的工作。", "每人每天省下三个半到四个半小时。", "现在我在字节实习，做付费广告业务的智能体。", "它每个月给团队省下大约 80 小时。"], ["我还联合创办了一家小型传媒工作室。", "在那里我用数据判断内容表现。", "这些工作支撑了客户的商业决策。"], ["在比赛里，我为一个核电诊断项目做了片子和 PPT。", "我负责呈现，商业方案是团队的。"], ["两段经历教给我的是一件事。", "技术只有在接上真实需求、符合商业逻辑、并且被执行好，才产生价值。"], ["这就是我申请 MiM 的原因。", "我想补上战略管理、组织行为和商业决策这三块。", "我也被数字经济方向的课程和国际 capstone 吸引。"], ["将来我希望成为产品战略或商业战略方向的专业人士。", "能把技术和业务接起来，帮组织把创新变成可持续的增长。"]],
+        notes:["不要用专业开场。打招呼，然后直接切实习。","工作室只给一块，不再展开。","收口必须落到项目，不是落到学校。"]}
+  },
+  {
+    id:"s-why", code:"A1 · follow-up", kinds:["setup","tension","action","close"],
+    en:{t:"Why this programme", hear:"Why do you want to join this programme? / Why MiM?",
+        spine:"From my experience → The gap → The programme → Close",
+        keys:"two parts: yourself and the programme ｜ name the gap ｜ name a real course and the capstone",
+        blocks:[
+          {l:"From my experience", lines:["My internships gave me the product side.","What I kept running into was the management side.","I could build the tool, but I couldn't judge whether it was worth the organisational cost."]},
+          {l:"The gap", lines:["So I want the foundation my degree didn't give me.","Strategy, organisational behaviour, and business decision making."]},
+          {l:"The programme", lines:["Your programme is built around the digital economy.","Courses like Business Model Canvas for Digital Economy are exactly that.","And the International Capstone Project is a live consulting project.","That is much closer to the real job than a case study."]},
+          {l:"Close", lines:["That combination is why MiM is the programme I want."]}
+        ],
+        notes:["Answer from both sides: your own reason, then proof you know the programme.","Name at least one real course or the capstone. Vague praise reads as no research.","Do not list five courses. One course, one project, one reason.","What the capstone is, if they ask: last trimester, an overseas study trip, a live consulting project for a company in Asia, presenting to senior executives. Recent cohorts worked on tourism in Okayama, Japan. A project, not a case study."]},
+    zh:{t:"为什么是这个项目", hear:"你为什么想加入这个项目？／ 为什么是 MiM？",
+        spine:"我的经历 → 缺口 → 这个项目 → 收口",
+        keys:"两面答：你自己的一面 + 项目的一面 ｜ 点名缺口 ｜ 点名一门真实课程与 capstone",
+        labels:["我的经历","缺口","这个项目","收口"],
+        lines:[["实习给了我产品这一侧。", "我反复撞上的是管理这一侧。", "我能把工具做出来，但判断不了它值不值得付出组织的代价。"], ["所以我想补上学位没给我的地基。", "战略、组织行为、商业决策。"], ["你们的项目是以数字经济为主线搭的。", "像 Business Model Canvas for Digital Economy 这样的课，正好是这一路。", "而国际 capstone 是一个真实的咨询项目。", "这比做案例更接近工作本身。"], ["这两点合起来，就是我想读 MiM 的原因。"]],
+        notes:["两面都要答：自己的理由，再加「你了解这个项目」的证据。","至少点一门真实课程或 capstone。空泛的夸奖等于没做过功课。","不要列五门课。一门课、一个项目、一个理由。","capstone 是什么（被问到就用）：最后一个学期、含海外研学、以顾问身份做亚洲真实企业的项目、向高管汇报；近几届是日本冈山的旅游课题。是真实项目，不是案例课。"]}
+  },
+  {
+    id:"s-career", code:"A2", kinds:["setup","action","result","close"],
+    en:{t:"Career plan", hear:"What is your career plan, short term and long term?",
+        spine:"Where I am → Near term → Long term → Why here",
+        keys:"where you are ｜ near term ｜ long term ｜ why this programme",
+        blocks:[
+          {l:"Where I am", lines:["Right now, I'm finishing my degree, and interning at ByteDance."]},
+          {l:"Near term", lines:["In the next year or two, I want to work on AI products in a smaller company.","I want to see how decisions get made while a company is still young.","That is where the skills I have now get tested hardest."]},
+          {l:"Long term", lines:["Long term, I want to be the person a bigger company trusts with this question.","Not only which tools to buy. I mean how the company makes decisions.","That's a strategy role, not a product role."]},
+          {l:"Why here", lines:["That gap is why I want this programme.","I have the product side. I need the strategy and organisational side.","The capstone would let me work on a real consulting project. That is much closer to the job itself."]}
+        ],
+        notes:["Keep the two horizons clearly apart. Say near term, pause, then say long term.","Near term starts at graduation, not at the degree. Long term is a direction, not a rank.","End on the programme, so the answer connects to why you are here."]},
+    zh:{t:"职业规划", hear:"短期和长期，你的职业规划是什么？",
+        spine:"现在 → 近期 → 长期 → 为什么是这个项目",
+        keys:"现在在哪 ｜ 近期 ｜ 长期 ｜ 为什么是这个项目",
+        labels:["现在","近期","长期","为什么这里"],
+        lines:[["现在我在收尾学位，同时在字节实习。"], ["未来一两年，我想去一家更小的公司做 AI 产品。", "我想看一家公司还年轻的时候，决策是怎么做出来的。", "那是我现在这套产品能力最难被检验的地方。"], ["长期，我想成为大公司在这个问题上信任的人。", "不只是买什么工具，而是公司怎么做决策。", "那是战略角色，不是产品角色。"], ["这个缺口就是我想读这个项目的原因。", "产品这一侧我有，战略和组织那一侧我缺。", "capstone 能让我做一个真实的咨询项目，那更接近工作本身。"]],
+        notes:["两个时间段要分开。先说近期，停一下，再说长期。","别报一个你描述不了的职位名。","收口落在项目上，让这道题和「为什么来」接上。"]}
+  },
+  {
+    id:"s-three", code:"A3", kinds:["action","action","action","tension"],
+    en:{t:"Three words", hear:"Describe yourself in three words.",
+        spine:"Curious → Structured → Hands-on → The limit",
+        keys:"one word, one fact ｜ then one honest limit",
+        blocks:[
+          {l:"Curious", lines:["Curious. I moved from film into data and AI products.","Nobody asked me to. I wanted to understand how they worked."]},
+          {l:"Structured", lines:["Structured. When something is messy, my instinct is to write the definition down first.","On our agent, the first thing I did was map the definitions, and the metric fields.","An agent is only as good as its definitions."]},
+          {l:"Hands-on", lines:["Hands-on. I learn by building things, not by reading about them.","If something new comes out, I try it that week.","The automation tools, the agent, the content model — none of that was coursework."]},
+          {l:"The limit", lines:["My limit is the other side of that.","I'm better at building something than at judging whether it's worth building.","That judgement is what I came here to learn."]}
+        ],
+        notes:["Three words, three facts, three short moments. Then stop.","Do not explain the words. Prove them.","The limit must be real; a fake weakness costs more than it gains."]},
+    zh:{t:"三个词形容自己", hear:"用三个词形容你自己。",
+        spine:"好奇 → 有条理 → 动手型 → 边界",
+        keys:"一个词配一个事实 ｜ 最后给一条真边界",
+        labels:["好奇","有条理","动手型","边界"],
+        lines:[["好奇。我从影视转到数据和 AI 产品。", "没有人要求我这么做，是我想弄明白它是怎么运转的。"], ["有条理。事情一乱，我的第一反应是先把定义写下来。", "做智能体时，我第一件事是把业务口径和指标字段整理出来。", "智能体的上限，就是它的定义。"], ["动手型。我靠做来学，不靠读来学。", "有新工具、新方法出来，我当周就会试。", "自动化工具、智能体、内容评估模型——这些都不是课程作业。"], ["我的短板是这件事的另一面。", "我更擅长把东西做出来，不太擅长判断它值不值得做。", "这个判断力，就是我来这里想学的。"]],
+        notes:["三个词、三个事实，然后停。","不要解释词，要证明词。","边界要真；假的自谦比不说更贵。"]}
+  },
+  {
+    id:"s-challenge", code:"B1", kinds:["setup","tension","action","result","close"],
+    en:{t:"Internship challenge", hear:"What was the most challenging internship you had?",
+        spine:"The scale → The culture → The work → Result → Close",
+        keys:"TikTok ｜ 150+ countries, a billion-plus users a month, still growing ｜ user growth behind it, paid ads is one lever ｜ face-first culture, nobody guides you ｜ definitions unwritten ｜ 80 hours a month",
+        blocks:[
+          {l:"The scale", lines:["The hardest one is my current internship at ByteDance.","I work on a general-purpose agent, for the paid ads business.","Let me give you the scale first, because that is what makes this business complex.","TikTok covers more than 150 countries, with over a billion users a month, and it is still growing.","Growth at that scale does not happen on its own.","Behind it there is a whole user growth effort, and paid advertising is one of its main levers.","My product sits on that line, and the data behind it crosses many countries, many channels, and a huge number of metrics."]},
+          {l:"The culture", lines:["The second layer is the culture.","At ByteDance, every intern lands face-first.","Nobody stops their own work to walk you through anything.","You are expected to work it out yourself, and fast.","And my task sat right in the middle of those two layers.","For the agent to answer anything correctly, every metric has to be defined first, what it means, how it is calculated, which field it comes from.","A lot of that was never written down. It was word of mouth."]},
+          {l:"The work", lines:["So I went and found the people who actually knew.","One definition at a time, the data team, the business side, whoever made the call.","I wrote each one down, and kept the dictionary alive, because a definition nobody maintains is worthless.","Then I built the evaluation system on top of it, so we could measure whether the answers were getting better.","Those definitions were not mine to decide. But getting them confirmed was on me."]},
+          {l:"Result", lines:["The agent now saves the business about 80 hours a month.","And every iteration is measurable, so we know what actually improved."]},
+          {l:"Close", lines:["So what made it hard was not just the size of the business.","It was that nobody stops to hand you the answers, in a business of that size.","I worked it out, and the dictionary is still there, so the next person does not start from zero."]}
+        ],
+        notes:["Scale first, then culture. Do not assert complexity, show it: 150+ countries and a billion-plus users are public figures, safe to say. Never quote internal data.","The culture layer is what makes this story hard: nobody guides you. Do not play it as a complaint, it is the reason the story counts.","One story only. Meituan can come back as a single line at the end if you need it.","If asked which team: answer \"the paid ads product line\" and stop. Do not map the org chart."]},
+    zh:{t:"实习里最大的挑战", hear:"你最有挑战的一段实习是什么？",
+        spine:"体量有多大 → 文化：没人带 → 行动 → 结果 → 收口",
+        keys:"TikTok 体量 ｜ 150+ 国家、月活十亿以上、还在涨 ｜ 增长背后是用户增长体系，付费广告是抓手之一 ｜ 脸朝地文化，没人带 ｜ 定义没写下来 ｜ 每月 80 小时",
+        labels:["体量有多大","文化：没人带","行动","结果","收口"],
+        lines:[
+          ["最难的是我现在在字节的这段实习。","我负责的是付费广告业务的通用智能体。","先摆体量，因为业务的复杂度就在这里。","TikTok 覆盖 150 多个国家，月活用户十亿以上，而且还在增长。","这个量级的增长不会自己发生。","背后是整个用户增长体系在支撑，付费广告是其中一个主要抓手。","我的产品就在这条线上，背后的数据横跨很多国家、很多渠道，指标数量非常大。"],
+          ["第二层是文化。","在字节，每个实习生都是脸朝地摔进来的。","没有人会停下自己的活，专门带你。","预期就是你自己把它弄明白，而且要快。","而我接的活，正好卡在这两层的中间。","智能体要答对任何东西，前提是每个指标先被定义清楚：它是什么意思、怎么算、取哪个字段。","很多定义从来没被写下来过，是口口相传的。"],
+          ["所以我自己去找真正知道的人。","一个定义一个定义地确认：数据团队、业务侧、谁拍过板就找谁。","我把每一条都记下来，并且让这本字典一直活着——没人维护的定义等于没有。","然后我在这套底座上搭了评测体系，迭代到底有没有变好，是能测出来的。","定义不是我能拍板的，但把它确认下来是我的事。"],
+          ["现在这个智能体每月给业务侧省下大约 80 小时。","而且每次迭代都可衡量，我们知道到底改进了什么。"],
+          ["所以难的不只是业务体量。","是这么大的业务，还没有人停下来把答案递给你。","我自己把它弄明白了，而且这本字典还在，后面的人不用从零开始。"]
+        ],
+        notes:["先摆体量，再讲文化。150 多个国家、月活十亿以上是公开数字，可以讲；内部数据一个都不能提。","文化那段是这个故事真正难的地方：没人带。别讲成抱怨，它是这段经历有分量的原因。","只讲一个故事。需要的话，美团最多在最后补一句。","被问在哪个部门：答到「付费广告产品线」为止，别展开内部架构。"]}
+  },
+  {
+    id:"s-team", code:"B2", kinds:["setup","tension","action","result","close"],
+    en:{t:"Teamwork", hear:"Tell me about a time you worked in a team.",
+        spine:"Situation → Task → Action → Result → Close",
+        keys:"hospital shoot ｜ four groups to coordinate ｜ routes and timetable planned ｜ reshot, still delivered, client won gold ｜ agree responsibilities first",
+        blocks:[
+          {l:"Situation", lines:["I'd use a project from our studio.","We shot a product film for a competition team, inside a working hospital.","I led the crew for that job."]},
+          {l:"Task", lines:["The challenge was coordination.","We had a camera crew, our own team, the students we were filming, and hospital staff.","And the hospital was still running."]},
+          {l:"Action", lines:["I planned the routes and the timetable in advance.","Everyone knew where to be, and when.","I was also the one contact for the hospital, so they knew what to expect."]},
+          {l:"Result", lines:["A few scenes needed reshooting, but we still finished inside the window.","The deadline was close, so I edited the film myself, while coordinating two teammates.","We delivered on time.","The client team went on to win a national gold award."]},
+          {l:"Close", lines:["What I took from it is simple.","You agree on responsibilities and timing before the work starts."]}
+        ],
+        notes:["Do not invent an argument. The real difficulty was the schedule, not a fight.","If the follow-up is about disagreement, switch to the persuasion script."]},
+    zh:{t:"团队合作", hear:"讲一次你参与团队合作的经历。",
+        spine:"情境 → 任务 → 行动 → 结果 → 收口",
+        keys:"医院拍摄 ｜ 四方要协调 ｜ 提前排路线与时间表 ｜ 补拍仍按期交付、客户拿金奖 ｜ 开工前先定责任",
+        labels:["情境","任务","行动","结果","收口"],
+        lines:[["我用工作室的一个项目来讲。", "我们在营业中的医院里，给一个竞赛团队拍宣传片。", "那次是我带的组。"], ["难点是协调。", "现场有摄影组、我们自己的人、要拍的学生，还有医院员工。", "而且医院还在正常营业。"], ["我提前把路线和时间表排好。", "每个人清楚自己几点在哪。", "我也是医院侧的唯一对接人，让院方知道会发生什么。"], ["有几场需要补拍，但我们仍在计划窗口内完成。", "交片时间很紧，我自己上手剪辑，同时协调两个队友。", "我们按时交付了。", "客户团队后来拿了国家级金奖。"], ["我从中学到的很简单。", "开工前先把责任和时间讲清楚。"]],
+        notes:["不要编一场争论。当时的真实困难是档期，不是吵架。","如果追问的是「意见不一致」，就切到说服那篇。"]}
+  },
+  {
+    id:"s-persuade", code:"B2 · B3", kinds:["setup","tension","action","result","close"],
+    en:{t:"Persuasion and leading", hear:"Describe a situation where you had to persuade others to support your idea. / How did you lead a team when faced with different opinions?",
+        spine:"The squad → The disagreement → The move → Result → Close",
+        keys:"intern squad ｜ engineers, front-end, QA ｜ I led the product side ｜ UI felt optional to them ｜ I drew the prototypes myself ｜ framed around their needs ｜ they agreed",
+        blocks:[
+          {l:"The squad", lines:["The clearest example is from ByteDance.","I was the product intern on our agent.","Around me was a small squad of other interns, engineers, front-end, and QA.","I was the one leading the product side of that squad."]},
+          {l:"The disagreement", lines:["Our product did not really think about UI, or user experience.","So I raised it, and the squad pushed back.","Time was tight, and UI felt optional to them.","I was the one leading the product side, so it was on me to bring them around."]},
+          {l:"The move", lines:["I didn't argue from opinion. I brought the work with me.","Before the discussion, I drew the prototypes myself.","So we were talking about a concrete proposal, not an idea.","Then I framed it around what they needed.","For the engineers, it meant a clearer spec and fewer changes later.","For my mentor, it meant a product people could actually pick up."]},
+          {l:"Result", lines:["In the end they agreed, and we took it forward together."]},
+          {l:"Close", lines:["What I learned about leading: do not insist you are right.","Understand what the other side is worried about, and bring evidence instead of preference,","then show them how the proposal helps them get what they need."]}
+        ],
+        notes:["One script covers both questions: 'persuade others' and 'lead a team when faced with different opinions'. They will not ask both separately.","The squad detail is real: engineers, front-end and QA were intern peers, and you led the product side. Do not upgrade it to managing the team.","The result stays at \"they agreed\". Do not invent a later outcome."]},
+    zh:{t:"说服与带队", hear:"讲一次你让别人支持你想法的经历，你是怎么做到的？／ 作为负责人，团队意见不一致时你怎么处理？",
+        spine:"小队 → 分歧 → 做法 → 结果 → 收口",
+        keys:"实习生小队 ｜ 研发、前端、QA ｜ 产品侧由我牵头 ｜ UI 被当作可有可无 ｜ 我自己画原型 ｜ 围着对方的需求讲 ｜ 最后同意",
+        labels:["小队","分歧","做法","结果","收口"],
+        lines:[["最清楚的例子来自字节。", "我是智能体的产品实习生。", "身边是一支实习生小队：研发、前端、QA。", "产品这条线由我牵头。"], ["我们的产品基本没考虑 UI 和用户体验。", "所以我提出来，队里有人不同意。", "时间紧，UI 在他们看是可有可无的。", "产品侧是我牵的头，把大家拉到一张页面上，就是我的事。"], ["我没有拿观点去争，我把活儿先干了。", "讨论之前，我自己把原型画出来了。", "所以我们谈的是一个具体方案，不是一个想法。", "然后我围着他们需要什么讲。", "对研发来说，是规格更清楚、后面少改。", "对 mentor 来说，是用户真的能上手的产品。"], ["最后他们同意了，我们一起把它推下去。"], ["我学到的是：带头推一件事，不是坚持我是对的。", "是弄明白对方在担心什么，拿证据，不拿偏好，", "然后让他们看到这件事怎么帮他们拿到他们要的东西。"]],
+        notes:["一篇稿覆盖两问：「说服别人」和「带队处理分歧」，面试官不会拆开问。","小队细节是真的：研发、前端、QA 都是实习生同学，产品侧由你牵头。不要升级成「我管理团队」。","结果句停在「他们同意了」，不要编后续。"]}
+  },
+  {
+    id:"s-achieve", code:"B4", kinds:["setup","setup","action","result","close"],
+    en:{t:"An achievement", hear:"What is the achievement you are most proud of?",
+        spine:"Situation → Task → Action → Result → Close",
+        keys:"the studio, from nothing ｜ co-founder ｜ data I collected myself ｜ 80k first season, two clients won gold ｜ a method beats a taste",
+        blocks:[
+          {l:"Situation", lines:["The one I'm most proud of is the studio.","We started it from nothing, with no clients and no portfolio."]},
+          {l:"Task", lines:["We were a small media studio.","I was the co-founder, and I built our method for judging content value."]},
+          {l:"Action", lines:["I collected the data myself. Several platforms, over a hundred creators, more than seven hundred videos.","Then I turned it into a scoring model, and a dashboard our clients could use."]},
+          {l:"Result", lines:["In our first season, we made about 80,000 in revenue.","Two of our clients went on to win national gold awards.","That was their work, but our films helped them present it."]},
+          {l:"Close", lines:["What I took from it is that a method beats a taste.","I'd rather be able to show why something works."]}
+        ],
+        notes:["Keep the credit clear. The awards were the clients', not yours.","Do not list the revenue without saying whose revenue it is."]},
+    zh:{t:"最有成就感的事", hear:"你最引以为傲的成就是什么？",
+        spine:"情境 → 任务 → 行动 → 结果 → 收口",
+        keys:"工作室，从零开始 ｜ 联合创始人 ｜ 数据我自己采 ｜ 首季 8 万、两个客户拿金奖 ｜ 方法胜过品味",
+        labels:["情境","任务","行动","结果","收口"],
+        lines:[["我最引以为傲的是工作室。", "我们是从零开始的，没有客户，也没有作品集。"], ["我们是一个小传媒工作室。", "我是联合创始人，内容价值的评估方法是我搭的。"], ["数据是我自己采的：几个平台，一百多个创作者，七百多条视频。", "然后做成评分模型和看板，客户能直接用。"], ["第一个季度营收大约八万。", "两个客户后来拿了国家级金奖。", "那是他们的作品，我们的片子帮他们把它讲清楚了。"], ["我从中学到的是：方法论胜过手感。", "我更想能说出一个东西为什么成立。"]],
+        notes:["功劳要划清：奖是客户团队拿的。","报营收时要说清是谁的收入。"]}
+  },
+  {
+    id:"s-trend", code:"C1", kinds:["setup","action","tension","close"],
+    en:{t:"A trend you're watching", hear:"What consumer or market trend have you noticed recently?",
+        spine:"Answer → The mechanism → Where the work goes → Close",
+        keys:"AI moves from analysis into execution ｜ in paid ads ｜ the work moves to definitions and evaluation ｜ model comes last",
+        blocks:[
+          {l:"Answer", lines:["The change I keep an eye on is where AI sits in a business."]},
+          {l:"The mechanism", lines:["Two years ago, these tools mostly helped people look at data.","Now they take a step for you.","In paid ads, an agent can diagnose a weak account, suggest a targeting change, and drill into the numbers behind a result."]},
+          {l:"Where the work goes", lines:["Once the tool can take the step, the hard part moves to what it steps on.","Is the metric defined right, and can we tell whether the answer was any good.","So on my team, the time goes into definitions and evaluation first, and the model comes last."]},
+          {l:"Close", lines:["That part, I already do every day.","Turning it into something the whole team can rely on, that is what I want to learn here."]}
+        ],
+        notes:["Ground the trend in the business you actually sit in.","One trend, not three. A list of trends sounds like a news summary.","Do not preach about trust or human oversight. Say where your own time goes."]},
+    zh:{t:"你在关注的趋势", hear:"最近你观察到什么消费趋势或市场变化？",
+        spine:"结论 → 机制 → 活儿去了哪 → 收口",
+        keys:"AI 从分析层进执行层 ｜ 在付费广告里 ｜ 活儿移到定义和评测上 ｜ 模型排最后",
+        labels:["结论","机制","活儿去了哪","收口"],
+        lines:[["我一直盯的变化，是 AI 在一家公司里的位置。"], ["两年前，这些工具主要是帮人看数据。", "现在它能替人走一步。", "在付费广告里，智能体能诊断表现差的账户，给出定向调整建议，还能下钻到结果背后的数字。"], ["工具能替你走这一步之后，难点就移到它踩着的那层东西上。", "指标定义对不对？答案好不好，判断得出来吗？", "所以在我们的团队，时间先花在定义和评测上，模型反而排在最后。"], ["这部分，我每天就在做。", "把它变成整个团队都能依赖的东西，是我想来这里学的。"]],
+        notes:["趋势要落到你真正在场的业务里。","只讲一个趋势。列三个听起来像新闻摘要。","别讲「信任」「人要把关」这套大道理。就说你自己的时间去哪了。"]}
+  },
+  {
+    id:"s-compete", code:"C2", kinds:["setup","action","action","tension","close"],
+    en:{t:"Staying competitive", hear:"How can a company stay competitive in a fast-changing industry?",
+        spine:"Answer → One → Two → Three → Close",
+        keys:"process ｜ traceability ｜ how fast you find out ｜ none of them is raw speed",
+        blocks:[
+          {l:"Answer", lines:["I'd describe it as three things.","And none of them is speed."]},
+          {l:"One", lines:["First, can the company turn one-off success into a repeatable process?","At Meituan, our output improved because we wrote the workflows down, and judged them.","Not because someone worked harder."]},
+          {l:"Two", lines:["Second, can decisions be traced?","In a metric-heavy business, if nobody owns the definition behind a number,","people argue about conclusions instead of evidence."]},
+          {l:"Three", lines:["Third, and this is the one people skip: how fast can the company tell whether something is working?","Every serious company stops a project that does not pay back. That is not a difference.","The difference is how long it takes to find out — two quarters or two weeks.","That is what measurement buys you.","If you cannot tell whether last month's change helped, you are deciding by opinion.","On our agent, the evaluation system is what kept that loop short."]},
+          {l:"Close", lines:["So for me, competitiveness is process, traceability, and a short feedback loop."]}
+        ],
+        notes:["Say the three headings before the detail. They are the memory, not the examples.","Do not claim the decision alone; it was a team call, and \"we\" is accurate."]},
+    zh:{t:"怎么保持竞争力", hear:"在一个快速变化的行业里，公司怎么保持竞争力？",
+        spine:"结论 → 一 → 二 → 三 → 收口",
+        keys:"流程化 ｜ 可追溯 ｜ 多快能知道 ｜ 这三条都不是速度",
+        labels:["结论","一","二","三","收口"],
+        lines:[["我会说三件事。", "而且都不是速度。"], ["第一，能不能把一次性的成功变成可复制的流程？", "在美团，我们的产出提升是因为把流程写下来并逐项判断。", "不是因为谁更拼。"], ["第二，决策能不能追溯？", "在一个高度依赖指标的业务里，如果没人对数字背后的定义负责，", "大家吵的是结论，不是证据。"], ["第三，也是大家最容易忽略的：多快能知道一件事到底有没有用？", "正经公司都会停掉不划算的项目，这不是差别。", "差别是多久能看出来——两个季度，还是两周。", "这就是可衡量带来的东西。", "如果说不清上个月那次改动有没有用，那就是在靠感觉做决定。", "在我们的智能体上，评测体系就是把这条回路压短的东西。"], ["所以对我来说，竞争力是流程、可追溯，和一条短的反馈回路。"]],
+        notes:["先报三个小标题，再展开。记住的是标题，不是例子。","不要说成你一个人的决定，那是团队判断，「我们」是准确的。"]}
+  },
+  {
+    id:"s-tech", code:"C4", kinds:["setup","setup","action","action","tension","close"],
+    en:{t:"A company that won on technology", hear:"Name a company that became successful through technology, and why.",
+        spine:"Answer → Why → Mechanism one → Mechanism two → The limit → Close",
+        keys:"ByteDance ｜ data and recommendation ｜ content discovery and engagement ｜ applied to ads ｜ technology alone is not enough ｜ back to management",
+        blocks:[
+          {l:"Answer", lines:["I'd pick ByteDance."]},
+          {l:"Why", lines:["It shows how technology becomes an advantage when you understand users and the business."]},
+          {l:"Mechanism one", lines:["The first thing is data and recommendation.","They use it to improve what people discover and how much they engage.","It is not traditional content distribution. It connects users, to the content they want, at scale."]},
+          {l:"Mechanism two", lines:["The second thing is that they win in category after category — short video, news, novels, editing tools.","The reason is not the algorithm. It is that they start from the user.","Before anything ships, the question is what the user actually does, not what the feature can do.","In my internship, the work I was given was exactly that, the entry point, and where users get confused."]},
+          {l:"The limit", lines:["One limit, though: this only works with their data and their distribution.","A smaller company cannot copy it just by saying it is user-first.","The culture is the easiest thing to copy on paper, and the hardest in practice."]},
+          {l:"Close", lines:["That's exactly why I want to study management.","I want to understand not just how the technology works,","but how a company organises its resources around it, and builds an advantage that lasts."]}
+        ],
+        notes:["Never stop at \"because it has technology\". Unitree also wins on technology; it builds robots.","The mechanism that matters is not \"they reuse technology across businesses\" — every serious company does that. It is that they win in category after category because they start from the user.","Name one mechanism, then a second, then the limit. Do not list five."]},
+    zh:{t:"靠技术成功的公司", hear:"说一家靠技术成功的公司，以及为什么。",
+        spine:"结论 → 为什么 → 机制一 → 机制二 → 边界 → 收口",
+        keys:"字节 ｜ 数据与推荐 ｜ 从用户出发，所以每个品类都做到头部 ｜ 一个真实的边界 ｜ 回到管理",
+        labels:["结论","为什么","机制一","机制二","边界","收口"],
+        lines:[["我会选字节。"], ["它说明了一件事：看懂用户和生意，技术才会变成优势。"], ["第一件事是数据和推荐。", "他们用它改善用户发现内容和参与的程度。", "这不是传统的内容分发，它把用户和内容在规模上接起来。"], ["第二件事，是他们进一个品类就做到头部——短视频、资讯、小说、剪辑工具。", "原因不是算法，是他们从用户出发。", "东西上线之前，先问用户实际会怎么做，而不是功能能做什么。", "我实习里被交到手上的活正好就是这个：主入口，以及用户会在哪里卡住。"], ["但有一个边界：这套东西要配上他们的数据量和分发能力才成立。", "小公司光说一句「我们以用户为中心」是抄不走的。", "文化是纸面上最好抄、实践中最难抄的一样东西。"], ["这正是我想学管理的原因。", "我不只想弄懂技术怎么运转，", "还想弄懂一家公司怎么围绕它组织资源，并建立起能持续的优势。"]],
+        notes:["不要停在「因为它有技术」。宇树也是靠技术取胜的，人家造机器人。","别把「技术能在多业务间复用」当卖点——正经公司都这么干。真正的机制是：从用户出发，所以每个品类都能做到头部。","一个机制、再一个机制、然后给边界。不要列五个。"]}
+  },
+  {
+    id:"s-open", code:"D1 · D3", kinds:["setup","action","action","close"],
+    en:{t:"Open questions", hear:"If you could create a new emoji, what would it be? / Create a holiday that does not exist.",
+        spine:"Name it → The parts → What it means → Why → (optional tie back)",
+        keys:"four beats ｜ you can stay light ｜ no link to management needed ｜ never freeze",
+        blocks:[
+          {l:"The four beats", lines:["Say what the thing is.","Say what its parts are, and what each part stands for.","Say what the parts mean together.","Say why you'd want it in the world."]},
+          {l:"Example one", lines:["I'd make a light bulb connected to three puzzle pieces.","The bulb is the idea. The pieces are technology, business, and people.","The meaning is simple: a good idea only becomes valuable when the parts come together.","A technically impressive product can fail if it solves no real problem.","A strong strategy can fail if the team can't execute it."]},
+          {l:"Example two", lines:["I'd create First Draft Day. One day a year when you only show unfinished work.","Finished work isn't allowed that day.","I come from film, and the rough cut was always the moment that saved the film.","So the day would make being wrong early normal, instead of a confession."]},
+          {l:"Optional tie back", lines:["If it fits, add one line about how things get made."]},
+        ],
+        notes:["Nothing here is judged on content. It is judged on whether you finish the thought.","Pick the light version if the clock is short: one image, three sentences."]},
+    zh:{t:"开放怪题", hear:"如果可以创造一个新 emoji，你会造什么？／ 创造一个不存在的节日。",
+        spine:"点名 → 由什么构成 → 合起来什么意思 → 为什么 →（可选回扣）",
+        keys:"四拍 ｜ 可以很轻 ｜ 不必扣管理 ｜ 千万别卡住",
+        labels:["四拍","例一","例二","可选回扣"],
+        lines:[["先说你造的是什么东西。", "再说它由哪些部分组成，每部分代表什么。", "然后说这些部分合起来是什么意思。", "最后说你为什么想让它存在。"], ["我会做一个灯泡，连着三块拼图。", "灯泡是想法，三块拼图是技术、商业和人。", "意思很简单：好想法只有各部分凑到一起时才值钱。", "技术上很惊艳的产品，解决不了真问题也会失败。", "战略再好，团队执行不了也会失败。"], ["我会造一个「初稿节」，一年一天，只展示没做完的东西。", "那天不允许展出成品。", "我是影视出身，粗剪永远是救命的那一刻。", "所以这一天是让「早点出错」变成常态，而不是认罪。"], ["如果接得上，就加一句「事是怎么做成的」。"]],
+        notes:["这里不评内容，只看你能不能把话说圆。","时间紧就取轻版：一个画面，三句话。"]}
+  },
+  {
+    id:"s-others", code:"A4", kinds:["setup","setup","close"],
+    en:{t:"Other programmes", hear:"Which other programmes have you applied to?",
+        spine:"What I applied to → Why Hong Kong → Which one is first",
+        keys:"same region, same direction ｜ then the top choice and why ｜ never downgrade the others",
+        blocks:[
+          {l:"What I applied to", lines:["I applied in Hong Kong, in management, marketing and business analytics.","HKU, CUHK and HKUST."]},
+          {l:"Why Hong Kong", lines:["Hong Kong was a deliberate choice.","I want to build my career here, and learn the business context directly."]},
+          {l:"Which one is first", lines:["Among them, MiM is the one I want most.","It's the general management track, so it gives me the foundation my background doesn't."]}
+        ],
+        notes:["Two or three sentences. Do not turn it into a ranking.","Never criticise another programme. The only thing to sell is why this one is first."]},
+    zh:{t:"还申请了哪些项目", hear:"你还申请了哪些项目？",
+        spine:"申请了哪些 → 为什么是香港 → 哪个是第一志愿",
+        keys:"同地区同方向 ｜ 再说第一志愿与理由 ｜ 绝不贬低其他项目",
+        labels:["申请了哪些","为什么香港","第一志愿"],
+        lines:[["我申请的都是香港的项目，管理、营销和商业分析方向。", "港大、港中文、港科。"], ["选香港是有意的。", "我想在这里发展，直接了解这里的商业环境。"], ["这中间，MiM 是我最想去的。", "它是综合管理线，正好补上我背景里缺的地基。"]],
+        notes:["两三句话，不要变成排名。","不要踩任何其他项目。要卖的只有一件事：为什么这个排第一。"]}
+  },
+  {
+    id:"s-nuclear", code:"B4 · one project", kinds:["setup","setup","action","result","close"],
+    en:{t:"Nuclear project", hear:"Tell me about the nuclear diagnostics project. / What was your role?",
+        spine:"Situation → Task → Action → Result → Close",
+        keys:"112 units ｜ three-layer decision chain ｜ 12m down to 3.7m ｜ payback in months ｜ first prize, provincial",
+        blocks:[
+          {l:"Situation", lines:["We worked on a diagnostics system for the seals on reactor coolant pumps.","When a seal fails, the unit has to stop.","The market we sized was 112 units: 60 operating, 52 approved or under construction."]},
+          {l:"Task", lines:["I ran the commercial research with our lead, and I owned the packaging.","That meant the market sizing, the customer decision chain, and the value proposition.","I also made the product film, the marketing video, and the pitch deck."]},
+          {l:"Action", lines:["We pulled the installed base from public sources, and cross-checked it.","I mapped who decides: operations raise the need, engineering validates it, group procurement signs.","We built the cost case: 12 million a year per unit down to 3.7.","Import substitution and condition-based maintenance — but the biggest saving is avoided downtime.","Then the payback: 8.3 million saved a year against the system price, so it repays in months."]},
+          {l:"Result", lines:["We took first prize in the provincial round, top two percent.","The project moved into a provincial incubator and started talking to investors."]},
+          {l:"Close", lines:["What I took from it is that a technical system only becomes a business, when the numbers, the buyer, and the delivery model all line up.","That is the part I want to learn properly."]}
+        ],
+        notes:["Full background — how the research was done, how each number is built, and the 15 follow-up questions: 核电项目_完整说法.html in the same folder."]},
+    zh:{t:"核电项目", hear:"讲讲那个核电诊断项目。／ 你在里面负责什么？",
+        spine:"情境 → 任务 → 行动 → 结果 → 收口",
+        keys:"112 台 ｜ 三层决策链 ｜ 1200 万降到 370 万 ｜ 回收期几个月 ｜ 省赛一等奖",
+        labels:["情境","任务","行动","结果","收口"],
+        lines:[["我们做的是核主泵密封的智能诊断系统。", "密封一失效，机组就得停。", "我们盘的市场是 112 台：在运 60 台，在建及核准 52 台。"], ["我和负责人一起做了商业调研，呈现这块由我负责。", "包括市场规模、客户决策链和价值主张。", "产品片、宣传片和路演 PPT 也是我做的。"], ["装机量我们从公开渠道取，再交叉核对。", "我画了决策链：运行部门提需求，技术部门验证，集团集采签字。", "成本案做的是单台每年 1200 万降到 370 万。", "靠国产化替代和状态检修——但省得最多的是少停机。", "回收期：一年省 830 万，对比系统价格，几个月回本。"], ["我们在省赛拿了第一，前 2%。", "项目随后入驻省级科创园区，开始接触投资机构。"], ["我学到的是：技术系统只有在数字、买方和交付模型都对上时，才会变成一门生意。", "这正是我想系统学的那一部分。"]],
+        notes:["完整底料（调研怎么做、每个数字怎么来的、被追问的 15 问答）：同目录《核电项目_完整说法.html》。"]}
+  }
+];
+
+/* ================= other content ================= */
+const LOOP_STEPS = [
+  {key:false, en:{h:"Read the intent", p:"What action does it test? Not what topic it mentions."}, zh:{h:"判意图", p:"它在测哪个动作？不是它提到了什么话题。"}},
+  {key:true,  en:{h:"Pick a spine",  p:"Story, opinion, trait or motive. One of four."}, zh:{h:"挑骨架", p:"经历、观点、特质、动机，四选一。"}},
+  {key:true,  en:{h:"Load a story",  p:"One main story from the six. A second one gets a single line."}, zh:{h:"调素材", p:"六块里挑一块当主，第二块只给一句话。"}},
+  {key:false, en:{h:"Draft it",      p:"Three words on paper: verdict, story, close."}, zh:{h:"落三词", p:"纸上写三个词：结论、素材、收口。"}},
+  {key:false, en:{h:"Set the close",  p:"Land on the programme, the gap, or the goal."}, zh:{h:"定收口", p:"落在项目、缺口或去向。"}}
+];
+
+const STORIES = [
+  {en:{name:"Meituan",tag:"operations, automation, the organisation problem",facts:[
+    "Mapped 12 core workflows, judged each on feasibility, delivered 8 internal tools",
+    "Covered 83% of the interns' core work, plus 2 monthly tasks owned by full-time staff",
+    "Freed 3.5 to 4.5 hours per person per day; single tasks 4 to 35 times faster",
+    "After launch the intern headcount fell by about two thirds (3 left, 1 was hired)"],
+   close:"The bottleneck is the organisation, not the technology."},
+   zh:{name:"美团",tag:"运营、自动化、组织问题",facts:[
+    "梳理 12 项核心流程，按可行性判断，落地 8 款内部工具",
+    "覆盖团队实习生核心工作的 83%，另有 2 项正职月度工作",
+    "人均每天释放 3.5-4.5 小时；单项任务快 4-35 倍",
+    "上线后组内实习生编制缩减约三分之二（3 人走、补 1 人）"],
+   close:"瓶颈在组织，不在技术。"}},
+  {en:{name:"ByteDance",tag:"AI product, evaluation, being trusted",facts:[
+    "I own a general-purpose agent for the paid ads business, from basics to the main entry point",
+    "Built a maintained dictionary of business definitions and metric fields with the data team",
+    "Built the evaluation system from scratch: answer accuracy, depth and quality of analysis",
+    "Saves about 80 person-hours a month, measured against a manual baseline",
+    "Front-stage story: no designer on the team; in the intern squad I led the product side, drew the prototypes, and brought the engineers around"],
+   close:"Nobody stops to explain things here. The dictionary is how I kept moving anyway."},
+   zh:{name:"字节",tag:"AI 产品、评测、被信任",facts:[
+    "独立负责付费广告业务的通用智能体，从基础能力到主入口",
+    "与数据团队一起把业务口径与指标字段做成可维护的字典",
+    "从零搭评测体系：答案准确性、分析的深度与质量",
+    "每月节省约 80 人时，对人工基线、排除无效答案后统计",
+    "前台故事：团队没有专职设计；实习生小队里产品侧由我牵头，画了原型，把研发和前端说服了"],
+   close:"这里没人停下来给你讲解。这本字典，是我照样往前走的办法。"}},
+  {en:{name:"Studio",tag:"co-founder, content value, commercial judgement",facts:[
+    "Co-founded a media studio and built a content-value assessment method for our clients",
+    "Collected the data myself: multi-platform APIs, 100+ creators, 700+ videos",
+    "The report used 242 samples: 144 in the test group, 100 in the top-performer control group",
+    "First season revenue 80k; two clients went on to win national gold awards"],
+   close:"Content is worth what it adds to acquisition and retention, not what it adds to reach."},
+   zh:{name:"工作室",tag:"联合创始人、内容价值、商业判断",facts:[
+    "联合创办媒体工作室，为客户建立内容价值评估方法",
+    "数据自己采：多平台接口、100+ 创作者、700+ 视频",
+    "报告用了 242 个样本：144 个实验组、100 个头部对照组",
+    "首季营收 8 万；两个客户后来拿了国家级金奖"],
+   close:"内容值不值，看它对获客与转化的贡献，不看触达。"}},
+  {en:{name:"Film set",tag:"coordination, pressure, delivery",facts:[
+    "Shot a product film for a competition team inside a working hospital",
+    "Planned the routes and the timetable in advance; acted as the single point of contact",
+    "Several scenes needed reshooting and we still finished inside the planned window",
+    "The client team went on to win a national gold award"],
+   close:"Agree on responsibilities and timing before the work starts."},
+   zh:{name:"片场",tag:"协调、压力、交付",facts:[
+    "在营业中的医院里拍摄竞赛团队的宣传片",
+    "提前排好路线与时间表，做医院侧的唯一对接人",
+    "有几场需要补拍，仍在计划窗口内完成",
+    "客户团队后来拿了国家级金奖"],
+   close:"开工前先把责任和时间讲清楚。"}},
+  {en:{name:"Nuclear project",tag:"presentation, translation, the team's award",facts:[
+    "Challenge cup, provincial round: a diagnostics system for reactor coolant pump seals",
+    "My part was the presentation layer: product film, marketing video, pitch deck",
+    "Our first prize was the team's; the business case and the market research were the team's too"],
+   close:"A technology doesn't sell itself. Someone has to turn it into something people believe."},
+   zh:{name:"核电竞赛",tag:"做展示、做翻译、拿的是团队的奖",facts:[
+    "挑战杯省赛：核主泵密封智能诊断系统",
+    "我负责的是展示层：产品片、宣传片、路演 PPT",
+    "省赛一等奖是团队的；商业方案和市场调研也是团队的"],
+   close:"技术不会自己卖出去，得有人把它讲成别人愿意相信的东西。"}},
+  {en:{name:"Self-study",tag:"crossing fields on purpose",facts:[
+    "Finished the Coursera machine learning specialisation on 25 September",
+    "42 graded assignments passed, 4 certificates",
+    "IELTS 7.0 overall, 8.5 in reading"],
+   close:"I learned the quantitative side on real projects; the gap is turning it into a system."},
+   zh:{name:"跨专业自学",tag:"有目的地跨",facts:[
+    "2026-09-25 完成 Coursera 机器学习专项",
+    "42 项计分作业全部通过，4 张证书",
+    "雅思总分 7.0，阅读 8.5"],
+   close:"量化能力我是在真实项目里练出来的，缺口是把它变成体系。"}}
+];
+
+const SPINES = [
+  {en:{n:"Story",u:"B questions",p:"STAR: Situation → Task → Action → Result, then one closing line. 20 / 15 / 80 / 20 / 15 seconds."},
+   zh:{n:"经历",u:"B 类题",p:"STAR：情境 → 任务 → 行动 → 结果，最后加一句收口。20 / 15 / 80 / 20 / 15 秒。"}},
+  {en:{n:"Opinion",u:"C and D questions",p:"Answer → one or two mechanisms → one limit → close."},
+   zh:{n:"观点",u:"C 类和 D 类题",p:"结论 → 一到两个机制 → 一个边界 → 收口。"}},
+  {en:{n:"Trait",u:"A3 self-awareness",p:"Word → evidence → limit."},
+   zh:{n:"特质",u:"A3 自我认知",p:"关键词 → 证据 → 边界。"}},
+  {en:{n:"Motive",u:"A1, A2, A4",p:"Past → gap → this programme → future."},
+   zh:{n:"动机",u:"A1、A2、A4",p:"过去 → 缺口 → 这个项目 → 未来。"}}
+];
+
+const FRAMES = [
+  {en:{h:"Open",lines:["Let me answer this from one angle.","The clearest example is from ByteDance.","I'd start with the objective, not the tactic."]},
+   zh:{h:"开口",lines:["Let me answer this from one angle.","The clearest example is from ByteDance.","I'd start with the objective, not the tactic."],
+       gloss:["让我从一个角度来答。","最清楚的例子来自字节。","我会先讲目标，而不是先讲做法。"]}},
+  {en:{h:"Evidence",lines:["Two things made it work.","The number I can defend is 80 hours a month.","What changed was the process, not the tool."]},
+   zh:{h:"给证据",lines:["Two things made it work.","The number I can defend is 80 hours a month.","What changed was the process, not the tool."],
+       gloss:["两件事让它成立。","我能守住这个数：每月 80 小时。","变的是流程，不是工具。"]}},
+  {en:{h:"Limit",lines:["That said, technology alone doesn't explain it.","I wouldn't claim more than that.","The part I can't prove is the causality."]},
+   zh:{h:"划边界",lines:["That said, technology alone doesn't explain it.","I wouldn't claim more than that.","The part I can't prove is the causality."],
+       gloss:["话虽如此，光有技术解释不了它。","我不会说得比这更多。","我证明不了的那部分是因果。"]}},
+  {en:{h:"Close",lines:["What I took from it was…","That's why I want to learn this properly, not by trial and error.","So that's how I'd look at it."]},
+   zh:{h:"收口",lines:["What I took from it was…","That's why I want to learn this properly, not by trial and error.","So that's how I'd look at it."],
+       gloss:["我从里面拿到的是……","这就是为什么我想系统地学，而不是靠试错。","所以我会这样看这件事。"]}}
+];
+
+const POOL = [
+  {q:"Introduce yourself and tell us what attracts you most to our programme.",b:"A1",en:{w:"No CV dump, and do not open with the film degree."},zh:{w:"别念 CV；不要用影视专业开场。"}},
+  {q:"Why do you want to study management after a film degree?",b:"A1",en:{w:"Give a gap, not a job-market reason."},zh:{w:"讲能力缺口，不要讲「商科好找工作」。"}},
+  {q:"What is your career plan, short term and long term?",b:"A2",en:{w:"Make the plan and the programme feed each other."},zh:{w:"让规划和项目互为因果。"}},
+  {q:"How will this programme help your career?",b:"A2",en:{w:"Name the part you lack, not the prestige."},zh:{w:"说你缺的那一层，不说名气。"}},
+  {q:"Describe yourself in three words.",b:"A3",en:{w:"Every word needs one fact, and one of them needs a limit."},zh:{w:"每个词都要配一个事实，其中一个要带边界。"}},
+  {q:"What is a strength that others noticed before you did?",b:"A3",en:{w:"Making complicated things readable. Say who noticed it."},zh:{w:"把复杂的东西讲清楚。要说清是谁先发现的。"}},
+  {q:"What kind of leader do you want to be?",b:"A3",f:{en:"Set the standard and the ownership first, then get out of the way. The hospital shoot shows it.",zh:"先讲清标准和归属，然后放手。医院拍摄那次体现的就是这个。"},en:{w:"Do not tell a control story."},zh:{w:"不要讲成「什么都是我盯着」。"}},
+  {q:"What other programmes have you applied to?",b:"A4",en:{w:"Answer honestly, then name this one first choice. Do not downgrade the others."},zh:{w:"如实答，然后说这个是第一志愿；不要踩别的项目。"}},
+  {q:"What was the most challenging internship you had?",b:"B1",en:{w:"Scale first, then culture. Two layers, one story."},zh:{w:"先摆体量，再讲文化。两层，一个故事。"}},
+  {q:"Tell me about a time you solved a problem with almost no resources.",b:"B1",en:{w:"Meituan: feasibility over interest, 12 workflows down to 8 tools."},zh:{w:"美团：按可行性判断，12 项流程收成 8 款工具。"}},
+  {q:"How did you manage competing deadlines?",b:"B1",f:{en:"The studio delivery: scenes needed reshooting, the window was fixed, you triaged and still delivered.",zh:"工作室交付：有几场要补拍、窗口是死的，你做了取舍还是按时交了。"},en:{w:"Show the triage decision, not the busy week."},zh:{w:"讲取舍的决策，不要讲「那一周好忙」。"}},
+  {q:"Describe a situation where you had to persuade others to support your idea.",b:"B2",en:{w:"Use the squad story: the pushback, the prototypes, the framing."},zh:{w:"用小队那篇：分歧、原型、围着对方需求讲。"}},
+  {q:"Tell me about a time you worked in a team.",b:"B2",en:{w:"The hospital shoot: responsibilities and timing agreed up front."},zh:{w:"医院拍摄：开工前先把责任和时间讲清楚。"}},
+  {q:"How did you lead a team when faced with different opinions?",b:"B2",en:{w:"Same script as persuasion: the intern squad, the UI pushback."},zh:{w:"和说服题同一篇：实习生小队、UI 的分歧。"}},
+  {q:"Describe a time you took ownership of something.",b:"B3",en:{w:"What you decided and owned, not what the team did."},zh:{w:"讲你决定了什么、拥有什么，不是团队做了什么。"}},
+  {q:"What is the achievement you are most proud of?",b:"B4",en:{w:"Do not take the team's credit. The clients won the award."},zh:{w:"不要抢功。奖是客户团队拿的。"}},
+  {q:"Tell me about a time you failed.",b:"B4",f:{en:"No prepared story yet. Pick a real one and build it before the real interview.",zh:"还没有稿。挑一件真事，正式面试前补出来。"},en:{w:"Do not fake a failure, and do not turn it into a humble-brag."},zh:{w:"不要编，也不要讲成变相自夸。"}},
+  {q:"How do you take feedback?",b:"B4",f:{en:"On the agent evaluation we threw out the invalid answers before claiming the number, because it had to survive scrutiny.",zh:"做智能体评测时，我们先剔除无效答案再报数，因为这个数要经得起追问。"},en:{w:"Show that you care about being right, not about looking right."},zh:{w:"体现你在乎「对」，不是在乎「好看」。"}},
+  {q:"What consumer trends have you noticed in recent years?",b:"C1",en:{w:"AI moved from analysis into execution. Ground it in paid ads."},zh:{w:"AI 从分析层进到执行层。落到付费广告里讲。"}},
+  {q:"How has lifestyle change affected business strategy?",b:"C1",f:{en:"Pick one shift, give the mechanism it creates, then the limit of the claim.",zh:"挑一个变化，讲它带来的机制，再说这条判断的边界。"},en:{w:"Give a mechanism, not a list of habits."},zh:{w:"讲机制，不要列一堆生活习惯。"}},
+  {q:"How can a company stay competitive in a fast-changing industry?",b:"C2",en:{w:"Process, traceability, willingness to stop. Speed is not the answer."},zh:{w:"流程化、可追溯、敢停。速度不是答案。"}},
+  {q:"If you started a technology company, what problem would you solve?",b:"C2",f:{en:"Evaluation infrastructure for AI products: a way to check whether a tool works before it spreads.",zh:"做 AI 产品的评测基建：让公司在推广之前能验证一个工具到底行不行。"},en:{w:"Sell the ruler, not the tool."},zh:{w:"卖尺子，不卖工具。"}},
+  {q:"How do you measure whether marketing spend worked?",b:"C3",en:{w:"Incrementality and holdout. A low cost per acquisition can be a trap."},zh:{w:"看增量、用 holdout 对照。低 CPA 可能是陷阱。"}},
+  {q:"What role does brand building play in a company's success?",b:"C3",en:{w:"It keeps working after the spending stops. Loyalty is different from satisfaction."},zh:{w:"钱停花之后它还在起作用。忠诚和满意不是一回事。"}},
+  {q:"Name a company that became successful through technology, and why.",b:"C4",en:{w:"Six blocks. Never stop at \u201Cbecause it has technology\u201D."},zh:{w:"六个块。不要停在「因为它有技术」。"}},
+  {q:"How should humans and technology work together?",b:"C4",f:{en:"People set the frame, the agent drafts, people make the final call, and every review feeds the next iteration.",zh:"人定框架，智能体起草，人拍板；每一轮评审结果都进下一次迭代。"},en:{w:"Say which step people own, rather than saying technology should do more."},zh:{w:"说清哪一步归人，而不是说技术该做更多。"}},
+  {q:"What business or market have you been watching lately?",b:"C5",en:{w:"First-hand only: your own paid ads line."},zh:{w:"只用一手观察：你所在的付费广告投放线。"}},
+  {q:"If you could create a new emoji, what would it look like and what would it mean?",b:"D1",en:{w:"Four beats. No link to management needed."},zh:{w:"四拍。不必扣管理。"}},
+  {q:"Create a holiday that does not exist yet.",b:"D1",en:{w:"First Draft Day: one day for unfinished work. Give it a picture."},zh:{w:"初稿节：一天只展示没做完的东西。要给出画面。"}},
+  {q:"If you could have one superpower, what would it be?",b:"D1",en:{w:"Seeing how a number was calculated. Use it, do not just name it."},zh:{w:"一眼看清一个数字是怎么算出来的。要用起来，不能只报名字。"}},
+  {q:"You win a billion dollars. What are the first three things you do?",b:"D2",en:{w:"Knowledge, then capability, then people. An order, not a list."},zh:{w:"先认知，再能力，最后放人。给顺序，别列清单。"}},
+  {q:"If you could pause time for one day, what would you do?",b:"D2",en:{w:"One moment, not a montage."},zh:{w:"讲一个瞬间，不要放一段蒙太奇。"}},
+  {q:"If you could remove one fear from the world, what would it be?",b:"D2",en:{w:"The fear of saying \u201CI don't know\u201D. Back it with the evaluation work."},zh:{w:"怕说「我不知道」。用评测那件事撑着。"}},
+  {q:"If your life story became a book, what would the title be?",b:"D3",en:{w:"Keep it dry. No sentimentality."},zh:{w:"讲得干一点，别煽情。"}},
+  {q:"Which historical figure would you most like to meet?",b:"D3",en:{w:"Miyazaki, and ask how a creative team keeps one standard for forty years."},zh:{w:"宫崎骏。问他：一支创作团队怎么四十年保持同一个标准。"}},
+  {q:"If you could talk to any animal, which one, and what would you ask?",b:"D3",en:{w:"Bees: how does an organisation with no manager coordinate?"},zh:{w:"蜜蜂：一个没有 manager 的组织怎么协调。"}}
+];
+
+/* ================= render ================= */
+const $ = id => document.getElementById(id);
+let LANG = "en", treeFilter = "all", drawn = 0, timer = null;
+const clockState = {q:null, chosen:null, stage:"idle", left:20, speaking:false};
+
+const t = () => UI[LANG];
+const pick = o => o[LANG];
+const blockLabel = (sc, i) => LANG === "zh" && sc.zh.labels ? sc.zh.labels[i] : sc.en.blocks[i].l;
+
+function renderRail(){
+  const u = t();
+  $("brand").innerHTML = u.brand;
+  const secIds = ["loop","tree","stories","spines","scripts","drill"];
+  let html = `<div class="sec">${u.navSec}</div>`;
+  html += `<a href="#day" data-sec="day">${u.daySec}</a>`;
+  secIds.forEach((id,i)=>{ html += `<a href="#${id}" data-sec="${id}">${i+1} · ${u.sec[i]}</a>`; });
+  html += `<div class="sec rail-head">${u.navScripts}</div>`;
+  SCRIPTS.forEach(sc=>{ html += `<a class="sub" href="#${sc.id}" data-sub="${sc.id}">${pick(sc).t}</a>`; });
+  $("railnav").innerHTML = html;
+}
+
+function renderStatic(){
+  const u = t();
+  document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
+  $("lang-en").setAttribute("aria-pressed", String(LANG==="en"));
+  $("lang-zh").setAttribute("aria-pressed", String(LANG==="zh"));
+  ["loop","tree","stories","spines","scripts","drill"].forEach((id,i)=>{
+    $(id+"-h").innerHTML = `<b>${i+1}</b> · ${u.sec[i]}`;
+    $(id+"-lead").textContent = u.leads[i];
+  });
+  $("tree-note").innerHTML = u.treeNote;
+  $("day-h").innerHTML = u.daySec;
+  $("day-box").innerHTML = `<h3>${u.dayTitle}</h3><p class="deadline">${u.dayDeadline}</p>
+    <ul>${u.daySteps.map(x=>`<li>${x}</li>`).join("")}</ul>
+    <p class="focushint">${u.dayHelp}</p>`;
+  $("loop-grid").innerHTML = LOOP_STEPS.map((s,i)=>`<div class="step${s.key?" key":""}">
+    <span class="n">${u.stepN} ${i+1}</span><h3>${pick(s).h}</h3><p>${pick(s).p}</p></div>`).join("");
+  $("chips").innerHTML = u.chips.map((c,i)=>`<span class="chip${i===1?" hot":""}">${c}</span>`).join("");
+  $("changed").innerHTML = u.changed.map(c=>`<div>${c}</div>`).join("");
+  $("foot").textContent = u.foot;
+  $("draw").textContent = u.draw; $("again").textContent = u.again;
+  $("prep").textContent = u.prep; $("speak").textContent = u.speak;
+  $("clock-h").textContent = u.clockH;
+  $("togall").textContent = u.expand;
+  $("scount").textContent = SCRIPTS.length + u.scount;
+  $("stats").textContent = drawn + (drawn===1 ? u.statOne : u.statMany);
+  $("brand").innerHTML = u.brand;
+}
+
+function renderTree(){
+  const u = t();
+  $("tabs").innerHTML = u.tabs.map((label,i)=>{
+    const f = ["all","A","B","C","D"][i];
+    return `<button data-f="${f}" aria-pressed="${String(treeFilter===f)}">${label}</button>`;
+  }).join("");
+  const body = $("tree-body");
+  body.innerHTML = "";
+  ["A","B","C","D"].forEach(b=>{
+    if(treeFilter!=="all" && treeFilter!==b) return;
+    const br = pick(BRANCH[b]);
+    const head = document.createElement("div");
+    head.className = "branch-title";
+    head.innerHTML = `<h3>${br.name}</h3><span>${br.hint}</span>`;
+    body.appendChild(head);
+    const grid = document.createElement("div");
+    grid.className = "leaves";
+    LEAVES.filter(l=>l.b===b).forEach(l=>{
+      const d = pick(l);
+      const el = document.createElement("div");
+      el.className = "leaf";
+      el.innerHTML = `<span class="id">${l.id}</span><h4>${d.t}</h4><p class="tests">${d.q}</p>
+        <div class="fill"><b>${u.fillLabel}:</b> ${d.f}</div>`;
+      grid.appendChild(el);
+    });
+    body.appendChild(grid);
+  });
+}
+
+function renderStories(){
+  $("story-grid").innerHTML = STORIES.map((s,i)=>{
+    const d = pick(s);
+    return `<div class="story"><h3>${i+1}. ${d.name}</h3><span class="tag">${d.tag}</span>
+      <ul>${d.facts.map(f=>`<li>${f}</li>`).join("")}</ul><p class="close">${d.close}</p></div>`;
+  }).join("");
+}
+
+function renderSpines(){
+  $("spine-grid").innerHTML = SPINES.map(s=>{const d=pick(s);
+    return `<div class="spine"><h3>${d.n}</h3><div class="use">${d.u}</div><p>${d.p}</p></div>`;}).join("");
+  $("frame-grid").innerHTML = FRAMES.map(f=>{
+    const d = pick(f);
+    const lines = d.lines.map((l,i)=>`<p>${l}${LANG==="zh"&&d.gloss?`<span class="gloss">${d.gloss[i]}</span>`:""}</p>`).join("");
+    return `<div class="frame"><h4>${d.h}</h4>${lines}</div>`;
+  }).join("");
+}
+
+function renderScripts(){
+  const u = t();
+  $("legend").innerHTML = ["setup","tension","action","result","close"]
+    .map((k,i)=>`<span class="k-${k}"><i></i>${u.legend[i]}</span>`).join("");
+  $("script-list").innerHTML = SCRIPTS.map((sc,idx)=>{
+    const d = pick(sc), kinds = sc.kinds;
+    const spineLine = sc.en.blocks.map((b,i)=>blockLabel(sc,i)).join(" → ");
+    const board = sc.en.blocks.map((b,i)=>{
+      const k = kinds[i] || "setup";
+      const zhL = (LANG === "zh" && sc.zh.lines && sc.zh.lines[i]) ? sc.zh.lines[i] : null;
+      const body = zhL
+        ? zhL.map(x=>`<p class="zh">${x}</p>`).join("") + b.lines.map(l=>`<p class="sub">${l}</p>`).join("")
+        : b.lines.map(l=>`<p>${l}</p>`).join("");
+      return `<div class="blk k-${k}">
+        <div class="bhead"><span class="bnum">${i+1}</span><span class="blab">${blockLabel(sc,i)}</span></div>
+        ${body}
+      </div>`;
+    }).join("");
+    let tbl = "";
+    if(sc.en.table){
+      const T = (LANG === "zh" && sc.zh.table) ? sc.zh.table : sc.en.table;
+      tbl = `<table class="claimtable"><thead><tr>${T.head.map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+        <tbody>${T.rows.map(r=>`<tr>${r.map((c,i)=>`<td${i>0?' class="q"':''}>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    }
+    return `<details class="script" id="${sc.id}"${idx===0?" open":""}>
+      <summary>
+        <div class="stitle"><span>${d.t}</span><span class="code">${sc.code}</span><span class="plus">＋</span></div>
+        <p class="shell">${u.hearLabel}: ${d.hear}</p>
+        <p class="spine-line">${spineLine}</p>
+      </summary>
+      <div class="sbody">
+        <p class="keys">${u.keyLabel}: ${d.keys}</p>
+        <div class="board">${board}</div>
+        ${tbl}
+        <p class="focushint">${u.focusHint}</p>
+        ${d.notes.map(n=>`<p class="script-note">${n}</p>`).join("")}
+      </div></details>`;
+  }).join("");
+}
+
+/* ---------- drill ---------- */
+function renderDrill(){
+  const u = t();
+  if(!clockState.q){
+    $("qtext").textContent = u.idle; $("guess").style.display="none"; $("feedback").innerHTML="";
+    $("clock").innerHTML = `20<small>${u.prepUnit}</small>`; $("hint").textContent = u.hintIdle;
+    $("draw").style.display="inline-block"; $("again").style.display="none";
+    $("prep").disabled = true; $("speak").disabled = true; return;
+  }
+  $("qtext").textContent = clockState.q.q;
+  const leaf = LEAVES.find(l=>l.id===clockState.q.b), d = pick(leaf), g = $("guess");
+  g.style.display = "flex";
+  if(clockState.stage === "idle"){
+    g.innerHTML = ["A","B","C","D"].map(b=>`<button type="button" data-b="${b}">${pick(BRANCH[b]).name}</button>`).join("");
+    $("feedback").innerHTML = ""; $("hint").textContent = u.hintIdle;
+    $("prep").disabled = true; $("speak").disabled = true;
+  } else {
+    [...g.querySelectorAll("button")].forEach(btn=>{
+      btn.disabled = true;
+      if(btn.dataset.b === leaf.b) btn.classList.add("right");
+      else if(btn.dataset.b === clockState.chosen) btn.classList.add("wrong");
+    });
+    const lead = clockState.chosen === leaf.b
+      ? `<b>${u.correct} ${leaf.id} ${d.t}.</b> ${d.q}` : `<i>${u.sits} ${leaf.b}.</i> ${d.q}`;
+    const f = clockState.q.f ? clockState.q.f[LANG] : d.f;
+    $("feedback").innerHTML = `${lead}<br><b>${u.useLabel}</b> ${f}<br><i>${u.watchLabel}</i> ${clockState.q[LANG].w}`;
+    if(clockState.stage === "guessed") $("hint").textContent = u.hintPrep;
+  }
+  const label = clockState.speaking ? u.speakUnit : u.prepUnit;
+  $("clock").innerHTML = `${clockState.left}<small>${label}</small>`;
+  $("draw").style.display = "none";
+}
+
+function stopTimer(){ if(timer){ clearInterval(timer); timer = null; } }
+
+function drawQuestion(){
+  stopTimer();
+  clockState.q = POOL[Math.floor(Math.random()*POOL.length)];
+  clockState.chosen = null; clockState.stage = "idle"; clockState.left = 20; clockState.speaking = false;
+  drawn++;
+  $("stats").textContent = drawn + (drawn===1 ? t().statOne : t().statMany);
+  $("fill").style.width = "0%"; $("bar").classList.remove("speaking");
+  renderDrill();
+}
+
+function runClock(seconds, speaking){
+  const u = t();
+  stopTimer();
+  clockState.stage = speaking ? "speaking" : "prep";
+  clockState.speaking = speaking; clockState.left = seconds;
+  $("fill").style.width = "0%";
+  $("bar").classList.toggle("speaking", speaking);
+  $("bar").querySelector(".mark").style.left = (speaking ? (150/180*100) : 0) + "%";
+  $("hint").textContent = speaking ? u.hintSpeaking : u.hintPrep;
+  $("prep").disabled = true; $("speak").disabled = true;
+  $("clock").innerHTML = `${clockState.left}<small>${speaking ? u.speakUnit : u.prepUnit}</small>`;
+  timer = setInterval(()=>{
+    clockState.left--;
+    $("fill").style.width = Math.min(100, (seconds-clockState.left)/seconds*100) + "%";
+    $("clock").innerHTML = `${clockState.left}<small>${clockState.speaking ? t().speakUnit : t().prepUnit}</small>`;
+    if(clockState.left <= 0){
+      stopTimer(); clockState.left = 0;
+      $("clock").innerHTML = `0<small>${clockState.speaking ? t().speakUnit : t().prepUnit}</small>`;
+      if(!speaking){ clockState.stage = "prepDone"; $("hint").textContent = u.hintTimePrep; $("speak").disabled = false; }
+      else { clockState.stage = "done"; $("hint").textContent = u.hintTimeSpeak; $("again").style.display = "inline-block"; }
+    }
+  }, 1000);
+}
+
+function renderAll(){
+  renderRail(); renderStatic(); renderTree(); renderStories(); renderSpines(); renderScripts(); renderDrill();
+  if(clockState.stage === "prepDone") $("speak").disabled = false;
+  if(clockState.stage === "done") $("again").style.display = "inline-block";
+  observeSections();
+}
+
+/* ---------- events ---------- */
+document.body.addEventListener("click", e=>{
+  const blk = e.target.closest(".blk");
+  if(blk){
+    const board = blk.closest(".board");
+    if(blk.classList.contains("focus")){ blk.classList.remove("focus"); board.classList.remove("focusing"); }
+    else {
+      board.querySelectorAll(".blk").forEach(b=>b.classList.remove("focus"));
+      blk.classList.add("focus"); board.classList.add("focusing");
+    }
+    return;
+  }
+  const tab = e.target.closest("#tabs button");
+  if(tab){ treeFilter = tab.dataset.f; renderTree(); return; }
+  const g = e.target.closest("#guess button");
+  if(g && !g.disabled){ clockState.chosen = g.dataset.b; clockState.stage = "guessed"; renderDrill(); $("prep").disabled = false; return; }
+  if(e.target.closest("#draw") || e.target.closest("#again")){ drawQuestion(); return; }
+  if(e.target.closest("#prep")){ runClock(20,false); return; }
+  if(e.target.closest("#speak")){ runClock(180,true); return; }
+  if(e.target.closest("#lang-en")){ setLang("en"); return; }
+  if(e.target.closest("#lang-zh")){ setLang("zh"); return; }
+  const ta = e.target.closest("#togall");
+  if(ta){
+    const open = $("togall").dataset.open === "1";
+    document.querySelectorAll("details.script").forEach(d=>{ d.open = !open; });
+    $("togall").dataset.open = open ? "0" : "1";
+    $("togall").textContent = open ? t().expand : t().collapse;
+  }
+});
+
+function observeSections(){
+  if(!("IntersectionObserver" in window)) return;
+  const links = [...document.querySelectorAll(".rail nav a")];
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(!en.isIntersecting) return;
+      const id = en.target.id;
+      links.forEach(a=>{
+        const hit = a.dataset.sec === id || a.dataset.sub === id;
+        a.classList.toggle("on", hit);
+      });
+    });
+  }, {rootMargin:"-10% 0px -80% 0px", threshold:0});
+  document.querySelectorAll("section[id], details.script[id]").forEach(el=>io.observe(el));
+}
+
+function setLang(l){
+  LANG = l;
+  try{ localStorage.setItem("ic-lang", l); }catch(e){}
+  renderAll();
+}
+
+try{ const s = localStorage.getItem("ic-lang"); if(s === "zh" || s === "en") LANG = s; }catch(e){}
+renderAll();
+</script>
+</body>
+</html>
