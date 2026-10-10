@@ -60,17 +60,22 @@
   .lead{font-size:17px; color:var(--ink-2); margin:-4px 0 24px; max-width:70ch}
 
   @media (max-width:1000px){
-    aside.rail{position:sticky; top:0; width:auto; border-right:0; border-bottom:1px solid var(--line); padding:10px 16px 8px; background:var(--panel)}
+    aside.rail{position:fixed; top:auto; bottom:0; left:0; right:0; width:auto; z-index:40;
+      display:flex; align-items:center; gap:10px; border-right:0; border-top:1px solid var(--line);
+      padding:5px 12px calc(7px + env(safe-area-inset-bottom));
+      background:color-mix(in srgb, var(--panel) 92%, transparent);
+      backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px)}
     .content{margin-left:0}
-    .rail-top{display:flex; align-items:center; justify-content:space-between; gap:12px}
-    .rail-brand{font-size:14px}
-    .rail-brand span{display:none}
+    .rail-top{order:2; flex:0 0 auto; display:flex; align-items:center; gap:8px}
+    .rail-brand{display:none}
     .lang{margin:0}
-    .rail nav{display:flex; gap:4px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch}
-    .rail a{border-left:0; border-bottom:2px solid transparent; white-space:nowrap; padding:6px 10px}
+    .lang button{padding:3px 10px; font-size:12px}
+    .rail nav{order:1; flex:1 1 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:0; -webkit-overflow-scrolling:touch}
+    .rail a{border-left:0; border-bottom:2px solid transparent; white-space:nowrap; padding:6px 9px; font-size:12.5px}
     .rail a.on{border-left:0; border-bottom-color:var(--accent)}
     .rail .sec,.rail-head{display:none}
-    main{padding:24px 18px 70px}
+    main{padding:14px 16px calc(78px + env(safe-area-inset-bottom))}
+    section{scroll-margin-top:12px}
   }
 
   /* ---------- loop ---------- */
