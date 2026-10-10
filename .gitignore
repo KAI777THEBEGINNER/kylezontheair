@@ -54,3 +54,4 @@ next-env.d.ts
 
 # vercel CLI accidental redirect artifact (contained an OIDC token once)
 /-
+test-results/ (playwright output)
